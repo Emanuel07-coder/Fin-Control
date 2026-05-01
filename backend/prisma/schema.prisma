@@ -1,0 +1,95 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  name          String
+  email         String   @unique
+  passwordHash  String
+  currency      String   @default("BRL")
+  darkMode      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  categories    Category[]
+  transactions  Transaction[]
+  budgets       Budget[]
+  refreshTokens RefreshToken[]
+
+  @@map("users")
+}
+
+model Category {
+  id        String   @id @default(cuid())
+  userId    String?
+  name      String
+  color     String   // hex color e.g. "#3B82F6"
+  icon      String   // lucide-react icon name e.g. "credit-card"
+  isDefault Boolean  @default(false)
+
+  user      User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  transactions Transaction[]
+  budgets     Budget[]
+
+  @@unique([userId, name])
+  @@map("categories")
+}
+
+model Transaction {
+  id          String   @id @default(cuid())
+  userId      String
+  categoryId  String
+  type        TransactionType
+  amount      Int      // in centavos
+  description String?
+  date        DateTime
+  recurrence  RecurrenceType @default(NONE)
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+
+  @@map("transactions")
+}
+
+model Budget {
+  id        String   @id @default(cuid())
+  userId    String
+  categoryId String
+  amount    Int      // in centavos
+  month     String   // YYYY-MM
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, categoryId, month])
+  @@map("budgets")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("refresh_tokens")
+}
+
+enum TransactionType {
+  INCOME
+  EXPENSE
+}
+
+enum RecurrenceType {
+  NONE
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+

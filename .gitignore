@@ -1,0 +1,28 @@
+# Dependências
+node_modules/
+.pnpm-store/
+
+# Segurança (CRÍTICO - NÃO SUBIR)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+env.txt
+
+# Build e Cache
+dist/
+build/
+.vite/
+.next/
+.cache/
+out/
+
+# IDEs e Sistema
+.vscode/
+.idea/
+.DS_Store
+*.log
+
+# Prisma
+# Mantemos as migrations, mas ignoramos arquivos temporários
