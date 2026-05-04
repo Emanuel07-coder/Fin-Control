@@ -8,12 +8,32 @@ interface AuthRequest extends Request {
   user?: { userId: string };
 }
 
+interface CategoryFilters {
+  page: number;
+  limit: number;
+}
+
+const categoryFiltersSchema = require('zod').z.object({
+  page: require('zod').z.coerce.number().int().positive().default(1),
+  limit: require('zod').z.coerce.number().int().positive().max(100).default(10),
+});
+
 export const getCategories = async (req: AuthRequest, res: Response): Promise<void> => {
   const userId = req.user?.userId;
   if (!userId) throw new AppError('Usuário não autenticado', 401);
 
-  const page = Number(req.query.page ?? 1);
-  const limit = Number(req.query.limit ?? 20);
+  // Validar query params com Zod
+  let filters: CategoryFilters;
+  try {
+    filters = categoryFiltersSchema.parse(req.query);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      throw new AppError('Parâmetros de filtro inválidos', 400);
+    }
+    throw error;
+  }
+
+  const { page, limit } = filters;
   const skip = (page - 1) * limit;
 
   const [categories, total] = await Promise.all([

@@ -130,6 +130,38 @@ export const createTransaction = async (req: AuthRequest, res: Response): Promis
     },
   });
 
+  // Recorrência: gerar próximas transações (até 12)
+  if (validated.recurrence !== 'NONE') {
+    const baseDate = new Date(validated.date);
+    let nextDate = new Date(baseDate);
+    for (let i = 1; i <= 12; i++) {
+      switch (validated.recurrence) {
+        case 'DAILY':
+          nextDate.setDate(nextDate.getDate() + 1);
+          break;
+        case 'WEEKLY':
+          nextDate.setDate(nextDate.getDate() + 7);
+          break;
+        case 'MONTHLY':
+          nextDate.setMonth(nextDate.getMonth() + 1);
+          break;
+      }
+      if (nextDate.getFullYear() > baseDate.getFullYear() + 1) break;
+      
+      await prisma.transaction.create({
+        data: {
+          userId,
+          categoryId: validated.categoryId,
+          type: validated.type,
+          amount: validated.amount,
+          description: `[REC #${i}] ${validated.description || 'Recorrente'}`,
+          date: nextDate,
+          recurrence: validated.recurrence,
+        },
+      });
+    }
+  }
+
   res.status(201).json({
     message: 'Transação criada com sucesso',
     data: transaction,

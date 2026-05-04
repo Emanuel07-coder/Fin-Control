@@ -13,7 +13,7 @@ interface AuthRequest extends Request {
 // ============================================
 
 const formatCurrency = (value: number): string => {
-  return (value / 100).toFixed(2).replace('.', ',');
+  return (value / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 };
 
 const formatDate = (date: Date): string => {
