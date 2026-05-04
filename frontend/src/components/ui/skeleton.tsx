@@ -15,7 +15,7 @@ export const Skeleton: React.FC<SkeletonProps> = ({ className = '' }) => {
 // Stats Card Skeleton
 export const StatsCardSkeleton: React.FC = () => {
   return (
-    <div className="bento-item p-6 rounded-xl bg-gradient-to-br from-near-black to-rich-black border-gold-accent/20">
+    <div data-testid="stats-card-skeleton" className="bento-item p-6 rounded-xl bg-gradient-to-br from-near-black to-rich-black border-gold-accent/20">
       <div className="flex items-start justify-between mb-4">
         <div className="space-y-2">
           <Skeleton className="h-3 w-16" />

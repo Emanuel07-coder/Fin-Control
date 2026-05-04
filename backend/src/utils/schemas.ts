@@ -56,6 +56,20 @@ export const budgetSchema = z.object({
 
 export const budgetUpdateSchema = budgetSchema.partial();
 
+// Schema para paginação de categorias
+export const categoryFiltersSchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(20),
+});
+
+// Schema para filtros de transações
+export const transactionFiltersSchema = z.object({
+  page: z.coerce.number().int().positive().default(1),
+  limit: z.coerce.number().int().positive().max(100).default(20),
+});
+
+export type CategoryFilters = z.infer<typeof categoryFiltersSchema>;
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type RefreshInput = z.infer<typeof refreshSchema>;
@@ -68,4 +82,9 @@ export type TransactionInput = z.infer<typeof transactionSchema>;
 export type TransactionUpdateInput = z.infer<typeof transactionUpdateSchema>;
 export type BudgetInput = z.infer<typeof budgetSchema>;
 export type BudgetUpdateInput = z.infer<typeof budgetUpdateSchema>;
+
+// Schema para filtros de exportação (igual transactionFilters)
+export const exportFiltersSchema = transactionFiltersSchema;
+
+export type ExportFilters = z.infer<typeof exportFiltersSchema>;
 
