@@ -21,7 +21,7 @@
     }
   },
   "include": ["src"],
-  "exclude": ["node_modules", "**/*.text.ts", "**/*.text.tsx"]
+  "exclude": ["node_modules", "**/*.text.ts", "**/*.text.tsx"],
   "references": [{ "path": "./tsconfig.node.json" }]
 }
 
