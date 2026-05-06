@@ -3,16 +3,22 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 import Dashboard from '../pages/Dashboard';
-import { AuthProvider } from '../context/AuthContext';
+import { AuthProvider, useAuth } from '../context/AuthContext';
 import * as hooks from '../hooks/useDashboard';
-import * as authModule from '../context/AuthContext';
 
 // Mock modules
 vi.mock('../hooks/useDashboard');
-vi.mock('../context/AuthContext');
+vi.mock('../context/AuthContext', () => {
+  return {
+    __esModule: true,
+    AuthProvider: ({ children }: { children: React.ReactNode }) => children,
+    useAuth: vi.fn(),
+  };
+});
 
 const mockUseAuth = vi.fn();
-authModule.useAuth = mockUseAuth;
+vi.mocked(useAuth).mockImplementation(mockUseAuth);
+
 
 describe('Dashboard', () => {
   let queryClient: QueryClient;
