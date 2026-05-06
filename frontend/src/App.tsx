@@ -8,8 +8,8 @@ import Dashboard from './pages/Dashboard';
 import Transactions from './pages/Transactions';
 import Categories from './pages/Categories';
 import Budgets from './pages/Budgets';
-import { Button } from './components/ui/button';
-import { Loader2, LayoutDashboard, Receipt, Tag, Wallet, Settings } from 'lucide-react';
+import { Loader2, LayoutDashboard, Receipt, Tag, Wallet } from 'lucide-react';
+
 import { motion } from 'framer-motion';
 
 // ============================================
@@ -38,7 +38,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
 // Layout with Sidebar
 // ============================================
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { logout, user } = useAuth();
+  const { user } = useAuth();
   const { currency } = useThemeStore();
   
   const navItems = [
