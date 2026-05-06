@@ -117,10 +117,11 @@ api.interceptors.response.use(
         throw new Error('No refresh token available');
       }
 
-      // Chama o endpoint de refresh
-      const response = await axios.post('/api/auth/refresh', {
+      // Chama o endpoint de refresh (usa o mesmo baseURL do axios global)
+      const response = await api.post('/auth/refresh', {
         refreshToken,
       });
+
 
       const { accessToken: newAccess, refreshToken: newRefresh } = response.data.data as {
         accessToken: string;
