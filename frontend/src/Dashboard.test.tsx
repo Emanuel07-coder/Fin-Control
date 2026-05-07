@@ -1,6 +1,5 @@
-import { render } from '@testing-library/react';
-import { screen } from '@testing-library/react';
-import { waitFor } from '@testing-library/dom';
+import { render, screen, waitFor } from '@testing-library/react';
+
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
