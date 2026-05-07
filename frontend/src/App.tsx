@@ -99,6 +99,17 @@ const AppContent: React.FC = () => {
   return (
     <Routes>
       {/* Public Routes */}
+      {/* Landing page: Dashboard (protegida) */}
+      <Route
+        path="/"
+        element={
+          <ProtectedRoute>
+            <Layout>
+              <Dashboard />
+            </Layout>
+          </ProtectedRoute>
+        }
+      />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       
