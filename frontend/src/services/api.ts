@@ -42,8 +42,15 @@ export const getRefreshToken = (): string | null => refreshToken;
 // Instância do Axios
 // ============================================
 
+/**
+ * CORREÇÃO PARA VERCEL:
+ * Usamos import.meta.env.VITE_API_URL para pegar a URL do backend no servidor.
+ * Se não houver variável (ambiente local), usamos '/api' para o proxy do Vite.
+ */
+const API_URL = import.meta.env.VITE_API_URL || '/api';
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: API_URL,
   timeout: 10000,
   headers: {
     'Content-Type': 'application/json',
@@ -86,15 +93,12 @@ const processQueue = (error: Error | null, token: string | null = null): void =>
 api.interceptors.response.use(
   (response: AxiosResponse): AxiosResponse => response,
   async (error: AxiosError): Promise<unknown> => {
-    // Tipagem correta do originalRequest sem usar 'any'
     const originalRequest = error.config as CustomAxiosRequestConfig | undefined;
 
-    // Se não existir config, não for 401, ou já tentou refresh, rejeita
     if (!originalRequest || error.response?.status !== 401 || originalRequest._retry) {
       return Promise.reject(error);
     }
 
-    // Se já está renovando, enfileira a requisição
     if (isRefreshing) {
       return new Promise<string>((resolve, reject) => {
         failedQueue.push({ resolve, reject });
@@ -108,7 +112,6 @@ api.interceptors.response.use(
         .catch((err: Error) => Promise.reject(err));
     }
 
-    // Inicia o processo de refresh
     originalRequest._retry = true;
     isRefreshing = true;
 
@@ -117,38 +120,31 @@ api.interceptors.response.use(
         throw new Error('No refresh token available');
       }
 
-      // Chama o endpoint de refresh (usa o mesmo baseURL do axios global)
       const response = await api.post('/auth/refresh', {
         refreshToken,
       });
-
 
       const { accessToken: newAccess, refreshToken: newRefresh } = response.data.data as {
         accessToken: string;
         refreshToken: string;
       };
 
-      // Atualiza tokens em memória (sem localStorage!)
       accessToken = newAccess;
       refreshToken = newRefresh;
 
-      // Notifica a fila de requisições
       processQueue(null, newAccess);
 
-      // Atualiza headers e retenta a requisição original
       if (originalRequest.headers) {
         originalRequest.headers.Authorization = `Bearer ${newAccess}`;
       }
       
       return api(originalRequest);
     } catch (refreshError) {
-      // Falha no refresh: limpa tudo e rejeita a fila
       const err = refreshError instanceof Error ? refreshError : new Error('Refresh failed');
       processQueue(err, null);
       accessToken = null;
       refreshToken = null;
 
-      // Redireciona para login
       window.location.href = '/login';
       return Promise.reject(err);
     } finally {
@@ -158,3 +154,4 @@ api.interceptors.response.use(
 );
 
 export default api;
+
