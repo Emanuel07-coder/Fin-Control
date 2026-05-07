@@ -1,4 +1,5 @@
 import app from './src/utils/app';
+
 import prisma from './src/config/database';
 
 const PORT = process.env.PORT || 3001;
