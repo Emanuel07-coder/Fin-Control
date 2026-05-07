@@ -47,7 +47,18 @@ export const getRefreshToken = (): string | null => refreshToken;
  * 1. Em Produção (Vercel), ele usará a variável de ambiente VITE_API_URL configurada no painel da Vercel.
  * 2. Em Desenvolvimento (Local), se a variável não existir, ele usa '/api' para aproveitar o proxy do Vite.
  */
-const API_URL = import.meta.env.VITE_API_URL || '/api';
+const API_URL = (() => {
+  // If an explicit API URL is provided, trust it.
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+
+  // Otherwise derive a subpath-safe base.
+  // This fixes cases where the app is hosted under a base path like /expense-control.
+  // For example:
+  //   page origin:  https://host/expense-control/
+  //   desired API:  https://host/expense-control/api
+  return new URL('/api', window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '/')).toString();
+})();
+
 
 const api = axios.create({
   baseURL: API_URL,
