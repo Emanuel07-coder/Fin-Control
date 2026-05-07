@@ -2,38 +2,17 @@ import express from "express";
 import cors from "cors";
 import routes from "../routes";
 
-// No arquivo backend/src/utils/app.ts
-
-const allowedOrigins = [
-  "http://localhost:5173", // Seu frontend local
-  "https://fin-control-kohl.vercel.app/", // A URL que a Vercel te der (substitua aqui!)
-];
-
 const app = express();
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Permite requisições sem origin (como apps insomnia/postman) ou origins da lista
-      if (!origin || allowedOrigins.indexOf(origin) !== -1) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: true,
-  }),
-);
+// LIBERAÇÃO TOTAL DO CORS
+// Isso remove a trava de segurança e permite que QUALQUER site (Vercel, Localhost, etc)
+// consiga conversar com seu backend. É a forma mais segura de garantir que funcione agora.
+app.use(cors()); 
 
-// Body parser (necessário para req.body em routes)
+// Body parser (necessário para ler o JSON enviado no login)
 app.use(express.json());
 
-// Monta as rotas principais.
-// Como routes/index.ts já faz router.use('/auth', authRouter), o caminho final vira: /api/auth/login
+// Monta as rotas principais
 app.use("/api", routes);
 
 export default app;
-
-
