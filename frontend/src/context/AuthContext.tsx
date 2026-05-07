@@ -55,11 +55,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUser(user);
       navigate('/dashboard');
     } catch (err) {
-      const message = err instanceof AxiosError 
-        ? err.response?.data?.error || 'Erro ao fazer login'
+      const message = err instanceof AxiosError
+        ? (() => {
+            const apiError = err.response?.data?.error;
+            if (typeof apiError === 'string') return apiError;
+            if (apiError && typeof apiError === 'object' && 'message' in apiError) {
+              return String((apiError as { message: unknown }).message);
+            }
+            return 'Erro ao fazer login';
+          })()
         : 'Erro ao fazer login';
+
       setError(message);
-      throw new Error(message);
+      // evita "Error: [object Object]" e crash em produção
+      throw err;
     } finally {
       setIsLoading(false);
     }
