@@ -1,20 +1,17 @@
 import express from "express";
 import cors from "cors";
-import helmet from "helmet";
 import routes from "../routes";
-import { errorHandler } from "../middleware/error";
 
 // No arquivo backend/src/utils/app.ts
 
 const allowedOrigins = [
   "http://localhost:5173", // Seu frontend local
-  "https://seu-projeto-frontend.vercel.app", // A URL que a Vercel te der (substitua aqui!)
+  "https://fin-control-kohl.vercel.app/", // A URL que a Vercel te der (substitua aqui!)
 ];
 
 const app = express();
 
 app.use(
-
   cors({
     origin: (origin, callback) => {
       // Permite requisições sem origin (como apps insomnia/postman) ou origins da lista
@@ -30,5 +27,13 @@ app.use(
   }),
 );
 
+// Body parser (necessário para req.body em routes)
+app.use(express.json());
+
+// Monta as rotas principais.
+// Como routes/index.ts já faz router.use('/auth', authRouter), o caminho final vira: /api/auth/login
+app.use("/api", routes);
+
 export default app;
+
 
