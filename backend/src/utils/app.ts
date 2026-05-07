@@ -11,7 +11,10 @@ const allowedOrigins = [
   "https://seu-projeto-frontend.vercel.app", // A URL que a Vercel te der (substitua aqui!)
 ];
 
+const app = express();
+
 app.use(
+
   cors({
     origin: (origin, callback) => {
       // Permite requisições sem origin (como apps insomnia/postman) ou origins da lista
@@ -26,3 +29,6 @@ app.use(
     credentials: true,
   }),
 );
+
+export default app;
+
