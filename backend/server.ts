@@ -1,4 +1,5 @@
-import { app } from './src/utils/app';
+import app from './src/utils/app';
+
 
 import prisma from './src/config/database';
 
