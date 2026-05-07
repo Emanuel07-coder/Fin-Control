@@ -1,5 +1,7 @@
 import { render } from '@testing-library/react';
-import { screen, waitFor } from '@testing-library/react';
+import { screen } from '@testing-library/react';
+import { waitFor } from '@testing-library/dom';
+
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
 import '@testing-library/jest-dom'; // 👈 ESSENCIAL para o .toBeInTheDocument() funcionar
