@@ -13,7 +13,7 @@ const startServer = async (): Promise<void> => {
   try {
     await prisma.$connect();
     console.log('📦 Conectado ao banco de dados com sucesso');
-    app.listen(PORT, () => {
+    app.listen(Number(PORT), () => {
       console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
     });
   } catch (error) {
