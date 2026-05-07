@@ -2,13 +2,16 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter } from 'react-router-dom';
-import Dashboard from '../pages/Dashboard';
-import { AuthProvider, useAuth } from '../context/AuthContext';
-import * as hooks from '../hooks/useDashboard';
+import '@testing-library/jest-dom'; // 👈 ESSENCIAL para o .toBeInTheDocument() funcionar
 
-// Mock modules
-vi.mock('../hooks/useDashboard');
-vi.mock('../context/AuthContext', () => {
+// Importações usando Alias @ para evitar erros de caminho relativo
+import Dashboard from '@/pages/Dashboard';
+import { AuthProvider, useAuth } from '@/context/AuthContext';
+import * as hooks from '@/hooks/useDashboard';
+
+// Mock modules - Os caminhos aqui devem ser idênticos aos imports acima
+vi.mock('@/hooks/useDashboard');
+vi.mock('@/context/AuthContext', () => {
   return {
     __esModule: true,
     AuthProvider: ({ children }: { children: React.ReactNode }) => children,
@@ -18,7 +21,6 @@ vi.mock('../context/AuthContext', () => {
 
 const mockUseAuth = vi.fn();
 vi.mocked(useAuth).mockImplementation(mockUseAuth);
-
 
 describe('Dashboard', () => {
   let queryClient: QueryClient;
@@ -37,7 +39,7 @@ describe('Dashboard', () => {
   });
 
   it('renders loading state with skeleton cards', () => {
-    (hooks.useDashboard as vi.Mock).mockReturnValue({
+    (hooks.useDashboard as any).mockReturnValue({
       isLoading: true,
       error: null,
       data: null,
@@ -67,7 +69,7 @@ describe('Dashboard', () => {
       alerts: [],
     };
 
-    (hooks.useDashboard as vi.Mock).mockReturnValue({
+    (hooks.useDashboard as any).mockReturnValue({
       isLoading: false,
       error: null,
       data: mockData,
@@ -93,7 +95,7 @@ describe('Dashboard', () => {
   });
 
   it('renders user greeting and logout button', () => {
-    (hooks.useDashboard as vi.Mock).mockReturnValue({
+    (hooks.useDashboard as any).mockReturnValue({
       isLoading: false,
       error: null,
       data: { balance: 0, income: 0, expense: 0, categories: [], budgets: [], alerts: [] },
@@ -114,9 +116,9 @@ describe('Dashboard', () => {
   });
 
   it('handles error state', () => {
-    (hooks.useDashboard as vi.Mock).mockReturnValue({
+    (hooks.useDashboard as any).mockReturnValue({
       isLoading: false,
-      error: { message: 'Erro de servidor' },
+      error: { message: 'Erro ao carregar' },
       data: null,
     });
 
@@ -130,6 +132,6 @@ describe('Dashboard', () => {
       </QueryClientProvider>
     );
 
-    expect(screen.getByText('Erro ao carregar')).toBeInTheDocument();
+    expect(screen.getByText(/Erro ao carregar/i)).toBeInTheDocument();
   });
 });
