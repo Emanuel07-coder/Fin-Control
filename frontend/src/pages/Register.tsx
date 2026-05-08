@@ -91,7 +91,7 @@ const Register: React.FC = () => {
               animate={{ opacity: 1, y: 0 }}
               className="mb-4 p-4 rounded-lg border border-burgundy-text/20 bg-burgundy-quiet/10 text-burgundy-text text-sm"
             >
-              {error}
+              {typeof error === 'string' ? error : JSON.stringify(error)}
             </motion.div>
           )}
 

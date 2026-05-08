@@ -85,11 +85,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUser(user);
       navigate('/dashboard');
     } catch (err) {
-      const message = err instanceof AxiosError 
-        ? err.response?.data?.error || 'Erro ao registrar'
+      const message = err instanceof AxiosError
+        ? (() => {
+            const apiError = err.response?.data?.error;
+            if (typeof apiError === 'string') return apiError;
+            if (apiError && typeof apiError === 'object' && 'message' in apiError) {
+              return String((apiError as { message: unknown }).message);
+            }
+            return 'Erro ao registrar';
+          })()
         : 'Erro ao registrar';
+
       setError(message);
-      throw new Error(message);
+      // Mantém o erro lançando, mas com mensagem string já normalizada.
+      throw err;
     } finally {
       setIsLoading(false);
     }
