@@ -52,11 +52,17 @@ const API_URL = (() => {
   if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
 
   // Otherwise derive a subpath-safe base.
-  // This fixes cases where the app is hosted under a base path like /expense-control.
-  // For example:
+  // If the app is hosted under a base path (e.g. /expense-control/),
+  // then the API is also under that base path.
+  // Example:
   //   page origin:  https://host/expense-control/
   //   desired API:  https://host/expense-control/api
-  return new URL('/api', window.location.origin + window.location.pathname.replace(/\/[^/]*$/, '/')).toString();
+  //
+  // IMPORTANT: window.location.pathname may already include a route (e.g. /login),
+  // so we strip to the app base folder.
+  const path = window.location.pathname;
+  const basePath = path.replace(/\/[^/]*$/, '/');
+  return new URL('api', window.location.origin + basePath.endsWith('/') ? basePath : basePath + '/').toString();
 })();
 
 
