@@ -1,24 +1,23 @@
 import app from './src/utils/app';
-
-
 import prisma from './src/config/database';
 
-const PORT = Number(process.env.PORT) || 3001; // O Railway vai injetar 8080 aqui automaticamente
-
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
-});
+const PORT = Number(process.env.PORT) || 3001;
 
 const startServer = async (): Promise<void> => {
   try {
+    // 1. Primeiro, tentamos conectar ao banco de dados
     await prisma.$connect();
     console.log('📦 Conectado ao banco de dados com sucesso');
-    app.listen(Number(PORT), () => {
-      console.log(`🚀 Servidor rodando em http://localhost:${PORT}`);
+
+    // 2. SÓ DEPOIS de conectar ao banco, ligamos o servidor
+    // Usamos '0.0.0.0' para garantir que o Railway aceite conexões externas
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`🚀 Servidor rodando na porta ${PORT}`);
+      console.log(`🌐 URL: https://fin-control-production-d545.up.railway.app`);
     });
   } catch (error) {
-    console.error('❌ Erro ao iniciar o servidor:', error);
-    process.exit(1);
+    console.error('❌ Erro crítico ao iniciar o servidor:', error);
+    process.exit(1); // Fecha o app se o banco não conectar, forçando o Railway a reiniciar
   }
 };
 
