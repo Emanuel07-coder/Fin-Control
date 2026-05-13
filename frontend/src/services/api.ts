@@ -43,28 +43,12 @@ export const getRefreshToken = (): string | null => refreshToken;
 // ============================================
 
 /**
- * Lógica de URL Dinâmica:
- * 1. Em Produção (Vercel), ele usará a variável de ambiente VITE_API_URL configurada no painel da Vercel.
- * 2. Em Desenvolvimento (Local), se a variável não existir, ele usa '/api' para aproveitar o proxy do Vite.
+ * CORREÇÃO:
+ * Agora usamos apenas a variável de ambiente VITE_API_URL.
+ * Se você estiver no computador (local), ele usará o fallback 'http://localhost:3000/api'.
+ * Se estiver na Vercel, ele usará o valor que você configurou no painel da Vercel.
  */
-const API_URL = (() => {
-  // If an explicit API URL is provided, trust it.
-  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
-
-  // Otherwise derive a subpath-safe base.
-  // If the app is hosted under a base path (e.g. /expense-control/),
-  // then the API is also under that base path.
-  // Example:
-  //   page origin:  https://host/expense-control/
-  //   desired API:  https://host/expense-control/api
-  //
-  // IMPORTANT: window.location.pathname may already include a route (e.g. /login),
-  // so we strip to the app base folder.
-  const path = window.location.pathname;
-  const basePath = path.replace(/\/[^/]*$/, '/');
-  return new URL('api', window.location.origin + basePath.endsWith('/') ? basePath : basePath + '/').toString();
-})();
-
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -137,8 +121,7 @@ api.interceptors.response.use(
         throw new Error('No refresh token available');
       }
 
-      // Chama o endpoint de refresh usando a instância 'api'
-      // O caminho final será baseURL + '/auth/refresh'
+      // Chama o endpoint de refresh. O caminho final será API_URL + '/auth/refresh'
       const response = await api.post('/auth/refresh', {
         refreshToken,
       });
@@ -173,4 +156,3 @@ api.interceptors.response.use(
 );
 
 export default api;
-
