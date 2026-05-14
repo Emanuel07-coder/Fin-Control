@@ -24,6 +24,38 @@ const formatDate = (date: Date): string => {
 // Controllers
 // ============================================
 
+/**
+ * NOVO: Busca os dados do usuário logado
+ * Essa função é essencial para o AuthContext do Frontend não te expulsar da Dashboard
+ */
+export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.userId;
+
+    if (!userId) {
+      throw new AppError('Usuário não autenticado', 401);
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new AppError('Usuário não encontrado', 404);
+    }
+
+    // Retorna no formato { data: user } que o Frontend espera
+    res.status(200).json({ data: user });
+  } catch (error) {
+    if (error instanceof AppError) {
+      res.status(error.status).json({ error: error.message });
+      return;
+    }
+    console.error('Erro ao buscar perfil:', error);
+    res.status(500).json({ error: 'Erro interno ao buscar perfil' });
+  }
+};
+
 export const exportTransactions = async (req: AuthRequest, res: Response): Promise<void> => {
   const userId = req.user?.userId;
   if (!userId) throw new AppError('Usuário não autenticado', 401);
@@ -49,21 +81,17 @@ export const exportTransactions = async (req: AuthRequest, res: Response): Promi
     orderBy: { date: 'desc' },
   });
 
-  // TD-12: Exportação PDF com pdfkit
   if (format === 'pdf') {
     const doc = new PDFDocument({ margin: 50 });
     
-    // Configurar resposta como stream
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', 'attachment; filename=transactions.pdf');
     
     doc.pipe(res);
     
-    // Título
     doc.fontSize(20).text('FinControl - Relatório de Transações', { align: 'center' });
     doc.moveDown();
     
-    // Informações do período
     const periodText = startDate && endDate
       ? `Periodo: ${formatDate(startDate)} a ${formatDate(endDate)}`
       : startDate
@@ -75,7 +103,6 @@ export const exportTransactions = async (req: AuthRequest, res: Response): Promi
     doc.fontSize(12).text(periodText, { align: 'center' });
     doc.moveDown(2);
     
-    // Resumo
     const totalIncome = transactions
       .filter(t => t.type === 'INCOME')
       .reduce((sum, t) => sum + t.amount, 0);
@@ -91,11 +118,9 @@ export const exportTransactions = async (req: AuthRequest, res: Response): Promi
     doc.text(`Saldo: R$ ${formatCurrency(balance)}`);
     doc.moveDown(2);
     
-    // Tabela de transações
     doc.fontSize(14).text('Transações', { underline: true });
     doc.moveDown();
     
-    // Cabeçalho da tabela
     const tableTop = doc.y;
     doc.fontSize(10);
     doc.text('Data', 50, tableTop, { width: 80 });
@@ -107,7 +132,6 @@ export const exportTransactions = async (req: AuthRequest, res: Response): Promi
     doc.moveTo(50, tableTop + 15).lineTo(520, tableTop + 15).stroke();
     doc.moveDown();
     
-    // Linhas da tabela
     let yPosition = tableTop + 25;
     
     for (const tx of transactions) {
@@ -130,7 +154,6 @@ export const exportTransactions = async (req: AuthRequest, res: Response): Promi
       yPosition += 20;
     }
     
-    // Rodapé
     doc.moveDown(2);
     doc.fontSize(10).text('FinControl - Controle Financeiro Pessoal', 50, 750, { align: 'center' });
     
@@ -138,7 +161,6 @@ export const exportTransactions = async (req: AuthRequest, res: Response): Promi
     return;
   }
 
-  // CSV (padrão)
   const header = 'ID,Data,Tipo,Categoria,Valor,Descricao\n';
   const rows = transactions.map((transaction) => {
     const date = transaction.date.toISOString().split('T')[0];
