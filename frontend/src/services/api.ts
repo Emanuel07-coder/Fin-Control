@@ -1,35 +1,18 @@
 import axios, { AxiosError, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 
-// ============================================
-// Tipos para a fila de requisições
-// ============================================
-
 interface FailedQueueItem {
   resolve: (value: string) => void;
   reject: (reason: Error | null) => void;
 }
 
-// ============================================
-// Tipos customizados para o config do Axios
-// ============================================
-
 interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
 }
 
-// ============================================
-// Estado global dos tokens (COM PERSISTÊNCIA)
-// ============================================
-
-// Inicializamos as variáveis buscando do localStorage para que o login sobreviva ao F5
 let accessToken: string | null = localStorage.getItem('accessToken');
 let refreshToken: string | null = localStorage.getItem('refreshToken');
 let isRefreshing = false;
 let failedQueue: FailedQueueItem[] = [];
-
-// ============================================
-// Funções para atualizar tokens
-// ============================================
 
 export const setTokens = (access: string | null, refresh: string | null): void => {
   accessToken = access;
@@ -47,10 +30,6 @@ export const setTokens = (access: string | null, refresh: string | null): void =
 export const getAccessToken = (): string | null => accessToken || localStorage.getItem('accessToken');
 export const getRefreshToken = (): string | null => refreshToken || localStorage.getItem('refreshToken');
 
-// ============================================
-// Instância do Axios
-// ============================================
-
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 const api = axios.create({
@@ -61,13 +40,8 @@ const api = axios.create({
   },
 });
 
-// ============================================
-// Interceptor de requisição
-// ============================================
-
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig): InternalAxiosRequestConfig => {
-    // Pegamos o token mais atualizado (da variável ou do storage)
     const token = getAccessToken();
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -76,10 +50,6 @@ api.interceptors.request.use(
   },
   (error): Promise<never> => Promise.reject(error)
 );
-
-// ============================================
-// Processa a fila de requisições após refresh
-// ============================================
 
 const processQueue = (error: Error | null, token: string | null = null): void => {
   failedQueue.forEach(({ resolve, reject }) => {
@@ -91,10 +61,6 @@ const processQueue = (error: Error | null, token: string | null = null): void =>
   });
   failedQueue = [];
 };
-
-// ============================================
-// Interceptor de resposta: trata 401 e refresh automático
-// ============================================
 
 api.interceptors.response.use(
   (response: AxiosResponse): AxiosResponse => response,
@@ -136,9 +102,7 @@ api.interceptors.response.use(
         refreshToken: string;
       };
 
-      // IMPORTANTE: Usamos setTokens para salvar os novos tokens no localStorage
       setTokens(newAccess, newRefresh);
-
       processQueue(null, newAccess);
 
       if (originalRequest.headers) {
@@ -150,10 +114,10 @@ api.interceptors.response.use(
       const err = refreshError instanceof Error ? refreshError : new Error('Refresh failed');
       processQueue(err, null);
       
-      // Limpa tudo do storage e da memória
+      // Apenas limpamos os tokens. 
+      // O AuthContext e o ProtectedRoute vão detectar a falta de user/token e redirecionar.
       setTokens(null, null);
 
-      window.location.href = '/login';
       return Promise.reject(err);
     } finally {
       isRefreshing = false;
