@@ -3,10 +3,6 @@ import api, { getRefreshToken, setTokens, getAccessToken } from '../services/api
 import { useNavigate } from 'react-router-dom';
 import { AxiosError } from 'axios';
 
-// ============================================
-// Tipos
-// ============================================
-
 interface User {
   id: string;
   name: string;
@@ -26,46 +22,37 @@ interface AuthContextType {
   logout: () => void;
 }
 
-// ============================================
-// Contexto
-// ============================================
-
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
-
-// ============================================
-// Provider
-// ============================================
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  // Iniciamos isLoading como true para evitar que o app redirecione para o login 
-  // antes de checar se o usuário já estava logado.
   const [isLoading, setIsLoading] = useState(true); 
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const isAuthenticated = !!user;
 
-  // ===========================================================================
-  // RECUPERAÇÃO DE SESSÃO (O "Pulo do Gato")
-  // ===========================================================================
   useEffect(() => {
     const initAuth = async () => {
       try {
         const token = getAccessToken();
-        
         if (token) {
-          // Se existe um token no localStorage, perguntamos ao servidor quem é esse usuário.
-          // IMPORTANTE: Certifique-se de que seu backend tenha a rota GET /api/user/me
           const response = await api.get('/user/me'); 
           setUser(response.data.data);
         }
       } catch (err) {
-        console.log("Sessão expirada ou token inválido. Limpando dados...");
-        setTokens(null, null);
-        setUser(null);
+        // CORREÇÃO AQUI: Só desloga se o erro for 401.
+        // Se for erro de conexão, CORS ou 500, mantemos o usuário logado localmente
+        // para evitar que instabilidades de rede expulsem o usuário do app.
+        if (err instanceof AxiosError && err.response?.status === 401) {
+          console.log("Sessão expirada. Limpando dados...");
+          setTokens(null, null);
+          setUser(null);
+        } else {
+          console.error("Erro ao validar sessão (não é 401). Mantendo sessão local.");
+        }
       } finally {
-        setIsLoading(false); // Agora o app pode decidir se mostra Dashboard ou Login
+        setIsLoading(false);
       }
     };
 
@@ -79,9 +66,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const response = await api.post('/auth/login', { email, password });
       const { user, accessToken, refreshToken } = response.data.data;
 
-      // Salva no localStorage e na memória do Axios
       setTokens(accessToken, refreshToken);
-      // Salva o usuário no estado do React
       setUser(user);
       
       navigate('/dashboard');
@@ -159,8 +144,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     logout,
   };
 
-  // Enquanto o app está checando se o usuário já está logado (initAuth),
-  // mostramos uma tela de carregamento simples para evitar o "flash" da tela de login.
   if (isLoading && !user) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-rich-black">
@@ -171,10 +154,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
-
-// ============================================
-// Hook
-// ============================================
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
