@@ -14,15 +14,21 @@ let refreshToken: string | null = localStorage.getItem('refreshToken');
 let isRefreshing = false;
 let failedQueue: FailedQueueItem[] = [];
 
+// CORREÇÃO AQUI: Agora salvamos cada token de forma independente.
+// Se o refresh token for nulo, o access token AINDA ASSIM será salvo.
 export const setTokens = (access: string | null, refresh: string | null): void => {
   accessToken = access;
   refreshToken = refresh;
 
-  if (access && refresh) {
+  if (access) {
     localStorage.setItem('accessToken', access);
-    localStorage.setItem('refreshToken', refresh);
   } else {
     localStorage.removeItem('accessToken');
+  }
+
+  if (refresh) {
+    localStorage.setItem('refreshToken', refresh);
+  } else {
     localStorage.removeItem('refreshToken');
   }
 };
@@ -114,10 +120,7 @@ api.interceptors.response.use(
       const err = refreshError instanceof Error ? refreshError : new Error('Refresh failed');
       processQueue(err, null);
       
-      // Apenas limpamos os tokens. 
-      // O AuthContext e o ProtectedRoute vão detectar a falta de user/token e redirecionar.
       setTokens(null, null);
-
       return Promise.reject(err);
     } finally {
       isRefreshing = false;
