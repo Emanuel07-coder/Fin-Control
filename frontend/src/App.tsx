@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, Link } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { useThemeStore } from './store/themeStore';
 import Login from './pages/Login';
@@ -9,7 +9,6 @@ import Transactions from './pages/Transactions';
 import Categories from './pages/Categories';
 import Budgets from './pages/Budgets';
 import { Loader2, LayoutDashboard, Receipt, Tag, Wallet } from 'lucide-react';
-
 import { motion } from 'framer-motion';
 
 // ============================================
@@ -58,14 +57,14 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
         
         <nav className="space-y-2 mb-8">
           {navItems.map((item) => (
-            <a
+            <Link
               key={item.path}
-              href={item.path}
+              to={item.path}
               className="flex items-center gap-3 p-3 rounded-lg text-paper-dark/60 hover:text-paper-dark hover:bg-charcoal-light transition-colors"
             >
               <item.icon className="w-5 h-5" />
               {item.label}
-            </a>
+            </Link>
           ))}
         </nav>
         
@@ -73,11 +72,11 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <div className="flex items-center gap-3 p-3 rounded-lg bg-charcoal-light">
             <div className="w-8 h-8 rounded-full bg-gold-accent/20 flex items-center justify-center">
               <span className="text-gold-accent text-sm font-bold">
-                {user?.name?.charAt(0).toUpperCase()}
+                {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
               </span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-paper-dark text-sm truncate">{user?.name}</p>
+              <p className="text-paper-dark text-sm truncate">{user?.name || 'Usuário'}</p>
               <p className="text-paper-dark/60 text-xs">{currency}</p>
             </div>
           </div>
@@ -98,8 +97,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 const AppContent: React.FC = () => {
   return (
     <Routes>
-      {/* Public Routes */}
-      {/* Landing page: Dashboard (protegida) */}
       <Route
         path="/"
         element={
@@ -113,7 +110,6 @@ const AppContent: React.FC = () => {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       
-      {/* Protected Routes */}
       <Route
         path="/dashboard"
         element={
@@ -155,7 +151,6 @@ const AppContent: React.FC = () => {
         }
       />
       
-      {/* Default redirect */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
