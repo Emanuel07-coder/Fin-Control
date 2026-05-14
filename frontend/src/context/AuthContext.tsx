@@ -58,32 +58,22 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const response = await api.post('/auth/login', { email, password });
       
-         const login = async (email: string, password: string) => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const response = await api.post('/auth/login', { email, password });
-      
       // ========================================================
-      // ☢️ DEBUG SEGURO: Não quebra o build da Vercel
+      // ☢️ DEBUG SEGURO PARA VERCEL (TEXTO PURO)
       // ========================================================
       console.log("--- ☢️ ESTRUTURA REAL DO BACKEND ☢️ ---");
-      // Usamos JSON.stringify para forçar o navegador a mostrar o texto e não "Object"
       console.log("CONTEÚDO BRUTO:", JSON.stringify(response.data, null, 2)); 
       console.log("--- FIM DO DEBUG NUCLEAR ---");
       // ========================================================
 
-      // Pegamos a resposta de forma segura para evitar erros de 'undefined'
       const responseData = response.data as any;
       const data = responseData?.data || responseData;
 
-      // Tentamos capturar o token de várias formas comuns
       const accessToken = data?.accessToken || data?.token || data?.access_token || data?.access;
       const refreshToken = data?.refreshToken || data?.refresh_token || data?.refresh;
       const user = data?.user || data?.profile || data;
 
       if (!accessToken) {
-        // Se cair aqui, o login "funcionou" no servidor, mas o frontend não achou o token
         throw new Error("O servidor autenticou, mas o token não foi encontrado. Verifique o console do F12!");
       }
 
@@ -103,6 +93,29 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   };
 
+  const register = async (name: string, email: string, password: string) => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const response = await api.post('/auth/register', { name, email, password });
+      const responseData = response.data as any;
+      const data = responseData?.data || responseData;
+      
+      const accessToken = data?.accessToken || data?.token || data?.access_token || data?.access;
+      const refreshToken = data?.refreshToken || data?.refresh_token || data?.refresh;
+      const user = data?.user || data?.profile || data;
+
+      setTokens(accessToken, refreshToken);
+      setUser(user);
+      navigate('/dashboard');
+    } catch (err) {
+      setError('Erro ao registrar');
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const logout = useCallback(async () => {
     try {
       const refreshToken = getRefreshToken();
@@ -110,6 +123,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         await api.post('/auth/logout', { refreshToken });
       }
     } catch {
+      // Silenciando erro de logout
     } finally {
       setTokens(null, null);
       setUser(null);
