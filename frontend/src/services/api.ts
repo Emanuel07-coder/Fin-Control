@@ -18,11 +18,12 @@ interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
 }
 
 // ============================================
-// Estado global dos tokens
+// Estado global dos tokens (COM PERSISTÊNCIA)
 // ============================================
 
-let accessToken: string | null = null;
-let refreshToken: string | null = null;
+// Inicializamos as variáveis buscando do localStorage para que o login sobreviva ao F5
+let accessToken: string | null = localStorage.getItem('accessToken');
+let refreshToken: string | null = localStorage.getItem('refreshToken');
 let isRefreshing = false;
 let failedQueue: FailedQueueItem[] = [];
 
@@ -33,21 +34,23 @@ let failedQueue: FailedQueueItem[] = [];
 export const setTokens = (access: string | null, refresh: string | null): void => {
   accessToken = access;
   refreshToken = refresh;
+
+  if (access && refresh) {
+    localStorage.setItem('accessToken', access);
+    localStorage.setItem('refreshToken', refresh);
+  } else {
+    localStorage.removeItem('accessToken');
+    localStorage.removeItem('refreshToken');
+  }
 };
 
-export const getAccessToken = (): string | null => accessToken;
-export const getRefreshToken = (): string | null => refreshToken;
+export const getAccessToken = (): string | null => accessToken || localStorage.getItem('accessToken');
+export const getRefreshToken = (): string | null => refreshToken || localStorage.getItem('refreshToken');
 
 // ============================================
 // Instância do Axios
 // ============================================
 
-/**
- * CORREÇÃO:
- * Agora usamos apenas a variável de ambiente VITE_API_URL.
- * Se você estiver no computador (local), ele usará o fallback 'http://localhost:3000/api'.
- * Se estiver na Vercel, ele usará o valor que você configurou no painel da Vercel.
- */
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
 
 const api = axios.create({
@@ -64,8 +67,10 @@ const api = axios.create({
 
 api.interceptors.request.use(
   (config: InternalAxiosRequestConfig): InternalAxiosRequestConfig => {
-    if (accessToken && config.headers) {
-      config.headers.Authorization = `Bearer ${accessToken}`;
+    // Pegamos o token mais atualizado (da variável ou do storage)
+    const token = getAccessToken();
+    if (token && config.headers) {
+      config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
@@ -117,13 +122,13 @@ api.interceptors.response.use(
     isRefreshing = true;
 
     try {
-      if (!refreshToken) {
+      const currentRefreshToken = getRefreshToken();
+      if (!currentRefreshToken) {
         throw new Error('No refresh token available');
       }
 
-      // Chama o endpoint de refresh. O caminho final será API_URL + '/auth/refresh'
       const response = await api.post('/auth/refresh', {
-        refreshToken,
+        refreshToken: currentRefreshToken,
       });
 
       const { accessToken: newAccess, refreshToken: newRefresh } = response.data.data as {
@@ -131,8 +136,8 @@ api.interceptors.response.use(
         refreshToken: string;
       };
 
-      accessToken = newAccess;
-      refreshToken = newRefresh;
+      // IMPORTANTE: Usamos setTokens para salvar os novos tokens no localStorage
+      setTokens(newAccess, newRefresh);
 
       processQueue(null, newAccess);
 
@@ -144,8 +149,9 @@ api.interceptors.response.use(
     } catch (refreshError) {
       const err = refreshError instanceof Error ? refreshError : new Error('Refresh failed');
       processQueue(err, null);
-      accessToken = null;
-      refreshToken = null;
+      
+      // Limpa tudo do storage e da memória
+      setTokens(null, null);
 
       window.location.href = '/login';
       return Promise.reject(err);
