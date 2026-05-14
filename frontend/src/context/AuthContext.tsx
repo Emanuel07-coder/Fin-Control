@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
-import api, { getRefreshToken, setTokens } from '../services/api';
+import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
+import api, { getRefreshToken, setTokens, getAccessToken } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import { AxiosError } from 'axios';
 
@@ -38,11 +38,39 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  // Iniciamos isLoading como true para evitar que o app redirecione para o login 
+  // antes de checar se o usuário já estava logado.
+  const [isLoading, setIsLoading] = useState(true); 
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const isAuthenticated = !!user;
+
+  // ===========================================================================
+  // RECUPERAÇÃO DE SESSÃO (O "Pulo do Gato")
+  // ===========================================================================
+  useEffect(() => {
+    const initAuth = async () => {
+      try {
+        const token = getAccessToken();
+        
+        if (token) {
+          // Se existe um token no localStorage, perguntamos ao servidor quem é esse usuário.
+          // IMPORTANTE: Certifique-se de que seu backend tenha a rota GET /api/user/me
+          const response = await api.get('/user/me'); 
+          setUser(response.data.data);
+        }
+      } catch (err) {
+        console.log("Sessão expirada ou token inválido. Limpando dados...");
+        setTokens(null, null);
+        setUser(null);
+      } finally {
+        setIsLoading(false); // Agora o app pode decidir se mostra Dashboard ou Login
+      }
+    };
+
+    initAuth();
+  }, []);
 
   const login = async (email: string, password: string) => {
     setIsLoading(true);
@@ -51,8 +79,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const response = await api.post('/auth/login', { email, password });
       const { user, accessToken, refreshToken } = response.data.data;
 
+      // Salva no localStorage e na memória do Axios
       setTokens(accessToken, refreshToken);
+      // Salva o usuário no estado do React
       setUser(user);
+      
       navigate('/dashboard');
     } catch (err) {
       const message = err instanceof AxiosError
@@ -67,7 +98,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         : 'Erro ao fazer login';
 
       setError(message);
-      // evita "Error: [object Object]" e crash em produção
       throw err;
     } finally {
       setIsLoading(false);
@@ -97,26 +127,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         : 'Erro ao registrar';
 
       setError(message);
-      // Mantém o erro lançando, mas com mensagem string já normalizada.
       throw err;
     } finally {
       setIsLoading(false);
     }
   };
 
-  // TD-08: Logout seguro - enviar refreshToken no corpo da requisição
   const logout = useCallback(async () => {
     try {
       const refreshToken = getRefreshToken();
-      
       if (refreshToken) {
-        // Envia o refreshToken para invalidar no backend
         await api.post('/auth/logout', { refreshToken });
       }
     } catch {
-      // Continua mesmo se falhar (pode ser que o token já tenha expirado)
+      // Silencioso
     } finally {
-      // Limpa tokens e estado
       setTokens(null, null);
       setUser(null);
       setError(null);
@@ -133,6 +158,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     register,
     logout,
   };
+
+  // Enquanto o app está checando se o usuário já está logado (initAuth),
+  // mostramos uma tela de carregamento simples para evitar o "flash" da tela de login.
+  if (isLoading && !user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-rich-black">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-gold-accent" />
+      </div>
+    );
+  }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 };
