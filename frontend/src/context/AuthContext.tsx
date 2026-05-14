@@ -58,31 +58,33 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const response = await api.post('/auth/login', { email, password });
       
-       const login = async (email: string, password: string) => {
+         const login = async (email: string, password: string) => {
     setIsLoading(true);
     setError(null);
     try {
       const response = await api.post('/auth/login', { email, password });
       
       // ========================================================
-      // ☢️ DEBUG NUCLEAR: VAI PRINTAR TUDO EM TEXTO PURO
+      // ☢️ DEBUG SEGURO: Não quebra o build da Vercel
       // ========================================================
       console.log("--- ☢️ ESTRUTURA REAL DO BACKEND ☢️ ---");
-      console.log("CÓPIA ABAIXO (Copie tudo que estiver entre as linhas):");
-      console.log("--------------------------------------------------");
-      console.log(JSON.stringify(response.data, null, 2)); 
-      console.log("--------------------------------------------------");
+      // Usamos JSON.stringify para forçar o navegador a mostrar o texto e não "Object"
+      console.log("CONTEÚDO BRUTO:", JSON.stringify(response.data, null, 2)); 
       console.log("--- FIM DO DEBUG NUCLEAR ---");
       // ========================================================
 
-      // Tentativa de extração flexível para não travar o app enquanto debugamos
-      const data = response.data.data || response.data;
+      // Pegamos a resposta de forma segura para evitar erros de 'undefined'
+      const responseData = response.data as any;
+      const data = responseData?.data || responseData;
+
+      // Tentamos capturar o token de várias formas comuns
       const accessToken = data?.accessToken || data?.token || data?.access_token || data?.access;
       const refreshToken = data?.refreshToken || data?.refresh_token || data?.refresh;
-      const user = data?.user || data?.profile;
+      const user = data?.user || data?.profile || data;
 
       if (!accessToken) {
-        throw new Error("O servidor respondeu, mas não encontrei nenhum token. Olhe o console!");
+        // Se cair aqui, o login "funcionou" no servidor, mas o frontend não achou o token
+        throw new Error("O servidor autenticou, mas o token não foi encontrado. Verifique o console do F12!");
       }
 
       setTokens(accessToken, refreshToken);
@@ -93,7 +95,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       console.error("ERRO NO LOGIN:", err);
       const message = err instanceof AxiosError
         ? (err.response?.data?.error || 'Erro ao fazer login')
-        : 'Erro ao fazer login';
+        : (err instanceof Error ? err.message : 'Erro ao fazer login');
       setError(message);
       throw err;
     } finally {
