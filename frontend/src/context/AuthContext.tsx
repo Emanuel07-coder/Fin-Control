@@ -58,50 +58,45 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const response = await api.post('/auth/login', { email, password });
       
-      // ========================================================
-      // 🚀 DEBUG CRÍTICO: OLHE ISSO NO CONSOLE DO F12
-      // ========================================================
-      console.log("--- INÍCIO DO DEBUG DE LOGIN ---");
-      console.log("1. Resposta bruta do servidor:", response.data);
-      
-      if (response.data && response.data.data) {
-        console.log("2. Conteúdo de response.data.data:", response.data.data);
-        console.log("3. Tem accessToken?", !!response.data.data.accessToken);
-        console.log("4. Tem refreshToken?", !!response.data.data.refreshToken);
-      } else {
-        console.error("ERRO: A resposta não contém o objeto 'data'!");
-      }
-      console.log("--- FIM DO DEBUG DE LOGIN ---");
-      // ========================================================
-
-      const { user, accessToken, refreshToken } = response.data.data;
-
-      setTokens(accessToken, refreshToken);
-      setUser(user);
-      
-      navigate('/dashboard');
-    } catch (err) {
-      const message = err instanceof AxiosError
-        ? (err.response?.data?.error || 'Erro ao fazer login')
-        : 'Erro ao fazer login';
-      setError(message);
-      throw err;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const register = async (name: string, email: string, password: string) => {
+         const login = async (email: string, password: string) => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await api.post('/auth/register', { name, email, password });
-      const { user, accessToken, refreshToken } = response.data.data;
+      const response = await api.post('/auth/login', { email, password });
+      
+      // ========================================================
+      // ☢️ DEBUG SEGURO: Não quebra o build da Vercel
+      // ========================================================
+      console.log("--- ☢️ ESTRUTURA REAL DO BACKEND ☢️ ---");
+      // Usamos JSON.stringify para forçar o navegador a mostrar o texto e não "Object"
+      console.log("CONTEÚDO BRUTO:", JSON.stringify(response.data, null, 2)); 
+      console.log("--- FIM DO DEBUG NUCLEAR ---");
+      // ========================================================
+
+      // Pegamos a resposta de forma segura para evitar erros de 'undefined'
+      const responseData = response.data as any;
+      const data = responseData?.data || responseData;
+
+      // Tentamos capturar o token de várias formas comuns
+      const accessToken = data?.accessToken || data?.token || data?.access_token || data?.access;
+      const refreshToken = data?.refreshToken || data?.refresh_token || data?.refresh;
+      const user = data?.user || data?.profile || data;
+
+      if (!accessToken) {
+        // Se cair aqui, o login "funcionou" no servidor, mas o frontend não achou o token
+        throw new Error("O servidor autenticou, mas o token não foi encontrado. Verifique o console do F12!");
+      }
+
       setTokens(accessToken, refreshToken);
       setUser(user);
+      
       navigate('/dashboard');
     } catch (err) {
-      setError('Erro ao registrar');
+      console.error("ERRO NO LOGIN:", err);
+      const message = err instanceof AxiosError
+        ? (err.response?.data?.error || 'Erro ao fazer login')
+        : (err instanceof Error ? err.message : 'Erro ao fazer login');
+      setError(message);
       throw err;
     } finally {
       setIsLoading(false);
