@@ -58,23 +58,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const response = await api.post('/auth/login', { email, password });
       
-      // ========================================================
-      // ☢️ DEBUG SEGURO PARA VERCEL (TEXTO PURO)
-      // ========================================================
-      console.log("--- ☢️ ESTRUTURA REAL DO BACKEND ☢️ ---");
-      console.log("CONTEÚDO BRUTO:", JSON.stringify(response.data, null, 2)); 
-      console.log("--- FIM DO DEBUG NUCLEAR ---");
-      // ========================================================
-
       const responseData = response.data as any;
-      const data = responseData?.data || responseData;
+      const data = responseData?.data;
 
-      const accessToken = data?.accessToken || data?.token || data?.access_token || data?.access;
-      const refreshToken = data?.refreshToken || data?.refresh_token || data?.refresh;
-      const user = data?.user || data?.profile || data;
+      // CORREÇÃO AQUI: Acessando data.tokens.accessToken e data.tokens.refreshToken
+      const tokens = data?.tokens;
+      const accessToken = tokens?.accessToken || data?.accessToken;
+      const refreshToken = tokens?.refreshToken || data?.refreshToken;
+      const user = data?.user;
 
       if (!accessToken) {
-        throw new Error("O servidor autenticou, mas o token não foi encontrado. Verifique o console do F12!");
+        throw new Error("Erro ao extrair tokens de autenticação do servidor.");
       }
 
       setTokens(accessToken, refreshToken);
@@ -82,7 +76,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       
       navigate('/dashboard');
     } catch (err) {
-      console.error("ERRO NO LOGIN:", err);
       const message = err instanceof AxiosError
         ? (err.response?.data?.error || 'Erro ao fazer login')
         : (err instanceof Error ? err.message : 'Erro ao fazer login');
@@ -98,18 +91,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setError(null);
     try {
       const response = await api.post('/auth/register', { name, email, password });
-      const responseData = response.data as any;
-      const data = responseData?.data || responseData;
       
-      const accessToken = data?.accessToken || data?.token || data?.access_token || data?.access;
-      const refreshToken = data?.refreshToken || data?.refresh_token || data?.refresh;
-      const user = data?.user || data?.profile || data;
+      const responseData = response.data as any;
+      const data = responseData?.data;
+
+      // CORREÇÃO AQUI: Aplicando a mesma lógica do login no registro
+      const tokens = data?.tokens;
+      const accessToken = tokens?.accessToken || data?.accessToken;
+      const refreshToken = tokens?.refreshToken || data?.refreshToken;
+      const user = data?.user;
 
       setTokens(accessToken, refreshToken);
       setUser(user);
       navigate('/dashboard');
     } catch (err) {
-      setError('Erro ao registrar');
+      setError('Erro ao registrar usuário');
       throw err;
     } finally {
       setIsLoading(false);
