@@ -17,8 +17,6 @@ import { motion } from 'framer-motion';
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, isLoading } = useAuth();
 
-  // Enquanto o AuthContext está checando o token no backend, 
-  // mostramos o loading para evitar que o usuário seja redirecionado para o login indevidamente.
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-rich-black">
@@ -74,8 +72,8 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
           <div className="flex items-center gap-3 p-3 rounded-lg bg-charcoal-light">
             <div className="w-8 h-8 rounded-full bg-gold-accent/20 flex items-center justify-center">
               <span className="text-gold-accent text-sm font-bold">
-                {user?.name?.charAt(0).toUpperCase() || 'U'}
-              </span
+                {user?.name ? user.name.charAt(0).toUpperCase() : 'U'}
+              </span>
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-paper-dark text-sm truncate">{user?.name || 'Usuário'}</p>
@@ -99,7 +97,6 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 const AppContent: React.FC = () => {
   return (
     <Routes>
-      {/* Landing page: Dashboard (protegida) */}
       <Route
         path="/"
         element={
@@ -113,7 +110,6 @@ const AppContent: React.FC = () => {
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       
-      {/* Protected Routes */}
       <Route
         path="/dashboard"
         element={
@@ -155,7 +151,6 @@ const AppContent: React.FC = () => {
         }
       />
       
-      {/* Default redirect */}
       <Route path="*" element={<Navigate to="/dashboard" replace />} />
     </Routes>
   );
