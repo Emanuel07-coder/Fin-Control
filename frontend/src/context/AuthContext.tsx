@@ -41,21 +41,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           setUser(response.data.data);
         }
       } catch (err) {
-        // CORREÇÃO AQUI: Só desloga se o erro for 401.
-        // Se for erro de conexão, CORS ou 500, mantemos o usuário logado localmente
-        // para evitar que instabilidades de rede expulsem o usuário do app.
         if (err instanceof AxiosError && err.response?.status === 401) {
-          console.log("Sessão expirada. Limpando dados...");
           setTokens(null, null);
           setUser(null);
-        } else {
-          console.error("Erro ao validar sessão (não é 401). Mantendo sessão local.");
         }
       } finally {
         setIsLoading(false);
       }
     };
-
     initAuth();
   }, []);
 
@@ -64,6 +57,23 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setError(null);
     try {
       const response = await api.post('/auth/login', { email, password });
+      
+      // ========================================================
+      // 🚀 DEBUG CRÍTICO: OLHE ISSO NO CONSOLE DO F12
+      // ========================================================
+      console.log("--- INÍCIO DO DEBUG DE LOGIN ---");
+      console.log("1. Resposta bruta do servidor:", response.data);
+      
+      if (response.data && response.data.data) {
+        console.log("2. Conteúdo de response.data.data:", response.data.data);
+        console.log("3. Tem accessToken?", !!response.data.data.accessToken);
+        console.log("4. Tem refreshToken?", !!response.data.data.refreshToken);
+      } else {
+        console.error("ERRO: A resposta não contém o objeto 'data'!");
+      }
+      console.log("--- FIM DO DEBUG DE LOGIN ---");
+      // ========================================================
+
       const { user, accessToken, refreshToken } = response.data.data;
 
       setTokens(accessToken, refreshToken);
@@ -72,16 +82,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       navigate('/dashboard');
     } catch (err) {
       const message = err instanceof AxiosError
-        ? (() => {
-            const apiError = err.response?.data?.error;
-            if (typeof apiError === 'string') return apiError;
-            if (apiError && typeof apiError === 'object' && 'message' in apiError) {
-              return String((apiError as { message: unknown }).message);
-            }
-            return 'Erro ao fazer login';
-          })()
+        ? (err.response?.data?.error || 'Erro ao fazer login')
         : 'Erro ao fazer login';
-
       setError(message);
       throw err;
     } finally {
@@ -95,23 +97,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     try {
       const response = await api.post('/auth/register', { name, email, password });
       const { user, accessToken, refreshToken } = response.data.data;
-
       setTokens(accessToken, refreshToken);
       setUser(user);
       navigate('/dashboard');
     } catch (err) {
-      const message = err instanceof AxiosError
-        ? (() => {
-            const apiError = err.response?.data?.error;
-            if (typeof apiError === 'string') return apiError;
-            if (apiError && typeof apiError === 'object' && 'message' in apiError) {
-              return String((apiError as { message: unknown }).message);
-            }
-            return 'Erro ao registrar';
-          })()
-        : 'Erro ao registrar';
-
-      setError(message);
+      setError('Erro ao registrar');
       throw err;
     } finally {
       setIsLoading(false);
@@ -125,7 +115,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         await api.post('/auth/logout', { refreshToken });
       }
     } catch {
-      // Silencioso
     } finally {
       setTokens(null, null);
       setUser(null);
@@ -134,15 +123,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [navigate]);
 
-  const value = {
-    user,
-    isAuthenticated,
-    isLoading,
-    error,
-    login,
-    register,
-    logout,
-  };
+  const value = { user, isAuthenticated, isLoading, error, login, register, logout };
 
   if (isLoading && !user) {
     return (
@@ -157,8 +138,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error('useAuth deve ser usado dentro de AuthProvider');
-  }
+  if (!context) throw new Error('useAuth deve ser usado dentro de AuthProvider');
   return context;
 };
