@@ -14,8 +14,6 @@ let refreshToken: string | null = localStorage.getItem('refreshToken');
 let isRefreshing = false;
 let failedQueue: FailedQueueItem[] = [];
 
-// CORREÇÃO AQUI: Agora salvamos cada token de forma independente.
-// Se o refresh token for nulo, o access token AINDA ASSIM será salvo.
 export const setTokens = (access: string | null, refresh: string | null): void => {
   accessToken = access;
   refreshToken = refresh;
@@ -99,14 +97,23 @@ api.interceptors.response.use(
         throw new Error('No refresh token available');
       }
 
+      // Chamada para renovar o token
       const response = await api.post('/auth/refresh', {
         refreshToken: currentRefreshToken,
       });
 
-      const { accessToken: newAccess, refreshToken: newRefresh } = response.data.data as {
-        accessToken: string;
-        refreshToken: string;
-      };
+      // ========================================================
+      // ✅ CORREÇÃO CRÍTICA: Acessando data.tokens
+      // ========================================================
+      const responseData = response.data as any;
+      const tokens = responseData?.data?.tokens;
+
+      if (!tokens || !tokens.accessToken) {
+        throw new Error('Resposta de refresh inválida: Tokens não encontrados');
+      }
+
+      const newAccess = tokens.accessToken;
+      const newRefresh = tokens.refreshToken;
 
       setTokens(newAccess, newRefresh);
       processQueue(null, newAccess);
@@ -116,6 +123,8 @@ api.interceptors.response.use(
       }
       
       return api(originalRequest);
+      // ========================================================
+      
     } catch (refreshError) {
       const err = refreshError instanceof Error ? refreshError : new Error('Refresh failed');
       processQueue(err, null);
