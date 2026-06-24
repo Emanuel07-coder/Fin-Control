@@ -13,7 +13,9 @@ const startServer = async (): Promise<void> => {
     // Usamos '0.0.0.0' para garantir que o Railway aceite conexões externas
     app.listen(PORT, '0.0.0.0', () => {
       console.log(`🚀 Servidor rodando na porta ${PORT}`);
-      console.log(`🌐 URL: https://fin-control-production-d545.up.railway.app`);
+
+      const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
+      console.log(`🌐 URL: ${appUrl}`);
     });
   } catch (error) {
     console.error('❌ Erro crítico ao iniciar o servidor:', error);
