@@ -48,7 +48,7 @@ export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
     res.status(200).json({ data: user });
   } catch (error) {
     if (error instanceof AppError) {
-      res.status(error.status).json({ error: error.message });
+      res.status(error.statusCode).json({ error: error.message });
       return;
     }
     console.error('Erro ao buscar perfil:', error);
