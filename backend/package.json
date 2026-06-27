@@ -4,17 +4,17 @@
   "description": "Backend para FinControl - Controle Financeiro Pessoal",
   "main": "dist/server.js",
   "scripts": {
-  "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
-  "build": "tsc",
-  "start": "prisma migrate deploy && tsx src/server.ts", 
-  "prisma:generate": "prisma generate",
-  "prisma:migrate": "prisma migrate dev",
-  "prisma:seed": "ts-node prisma/seed.ts",
-  "prisma:studio": "prisma studio",
-  "test": "jest",
-  "lint": "eslint . --ext .ts"
-},
-
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate": "prisma migrate deploy",
+    "prisma:migrate:dev": "prisma migrate dev",
+    "prisma:seed": "tsx prisma/seed.ts",
+    "prisma:studio": "prisma studio",
+    "test": "vitest",
+    "lint": "eslint . --ext .ts"
+  },
   "dependencies": {
     "@prisma/client": "^6.3.1",
     "bcrypt": "^6.0.0",
@@ -41,8 +41,6 @@
     "@typescript-eslint/parser": "^7.15.0",
     "eslint": "^9.6.1",
     "prisma": "^6.3.1",
-    "ts-node-dev": "^2.0.0",
-    "tsc-alias": "^1.8.8",
     "tsx": "^4.7.2",
     "typescript": "^5.5.3",
     "vitest": "^1.6.0"
