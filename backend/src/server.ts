@@ -1,6 +1,7 @@
 import app from './utils/app';
 
-const PORT = process.env.PORT || 3000;
+// Garante que PORT seja sempre um número
+const PORT = Number(process.env.PORT) || 3000;
 const HOST = '0.0.0.0';
 
 console.log('=================================');
