@@ -28,7 +28,7 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }
             initial={{ opacity: 0, scale: 0.95, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 max-w-lg max-h-[80vh] overflow-y-auto bg-near-black border border-gold-accent/20 rounded-xl shadow-subtle-lg z-50"
+            className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 max-w-lg max-h-[70vh] overflow-y-auto bg-near-black border border-gold-accent/20 rounded-xl shadow-subtle-lg z-50"
           >
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-charcoal-lighter">
