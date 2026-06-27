@@ -6,48 +6,65 @@ import { errorHandler } from "../middleware/error";
 const app = express();
 
 // ===========================================================================
-// CONFIGURAÇÃO PARA RENDER (ATUALIZADO - ANTES ERA RAILWAY)
+// CONFIGURAÇÃO PARA RENDER
 // ===========================================================================
-// Esta linha diz ao Express para confiar no proxy do Render.
-// Necessário para obter o IP real do usuário (req.ip) e para o rate limiting.
 app.set('trust proxy', 1);
 
 // ===========================================================================
-// CORS - CONFIGURADO PARA O FRONTEND NA VERCEL
+// CORS - ACEITA TODAS AS ORIGINS DA VERCEL (production + preview)
 // ===========================================================================
 const allowedOrigins = [
-  'https://fin-control-kohl.vercel.app',                          // produção
-  'https://fin-control-nmdz2pwuk-emanuelwenzel2007-6559s-projects.vercel.app', // preview
-  'http://localhost:5173',                                         // dev local (Vite)
-  'http://localhost:3000',                                         // dev local (alternativo)
+  // Production
+  'https://fin-control-kohl.vercel.app',
+  
+  // Regex: aceita QUALQUER preview da Vercel (fin-control-qualquercoisa.vercel.app)
+  /^https:\/\/fin-control-.*\.vercel\.app$/,
+  
+  // Local development
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://localhost:4173',
 ];
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Permite requisições sem origin (ex: Postman, curl, server-to-server)
+    // Permite requisições sem origin (Postman, curl, server-to-server)
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = `CORS: Origem ${origin} não permitida`;
-      return callback(new Error(msg), false);
+    // Verifica origins exatas (strings)
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
     }
     
-    return callback(null, true);
+    // Verifica origins por regex
+    const isAllowed = allowedOrigins.some(allowed => {
+      if (allowed instanceof RegExp) {
+        return allowed.test(origin);
+      }
+      return false;
+    });
+    
+    if (isAllowed) {
+      return callback(null, true);
+    }
+    
+    console.warn(`❌ CORS bloqueado para origin: ${origin}`);
+    return callback(new Error(`Origem ${origin} não permitida pelo CORS`), false);
   },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  maxAge: 86400, // cache preflight por 24h
+  maxAge: 86400,
 }));
 
-// Body parser (necessário para ler o JSON enviado no login)
+// Body parser
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Monta as rotas principais
+// Rotas
 app.use("/api", routes);
 
-// Rota de health check (importante para o Render!)
+// Health check
 app.get('/api/health', (req, res) => {
   res.status(200).json({ 
     status: 'ok', 
@@ -56,7 +73,7 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Middleware de tratamento de erros
+// Error handler
 app.use(errorHandler);
 
 export default app;
