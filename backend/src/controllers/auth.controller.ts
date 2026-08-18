@@ -10,6 +10,7 @@ import {
   RegisterInput, LoginInput, RefreshInput, ProfileInput, ChangePasswordInput 
 } from '../utils/schemas';
 import { AppError } from '../utils/AppError';
+import { invalidateUserCache } from '../middleware/auth';
 
 interface AuthRequest extends Request {
   user?: JWTPayload;
@@ -68,7 +69,17 @@ export const refresh = async (req: AuthRequest, res: Response): Promise<void> =>
   const newRefreshToken = await rotateRefreshToken(payload.userId, oldRefreshToken);
   const accessToken = signAccessToken(payload);
 
-  res.json({ message: 'Tokens renovados com sucesso', data: { accessToken, refreshToken: newRefreshToken } });
+  res.json({ 
+    message: 'Tokens renovados com sucesso', 
+    data: { 
+      accessToken, 
+      refreshToken: newRefreshToken,
+      tokens: {
+        accessToken,
+        refreshToken: newRefreshToken,
+      }
+    } 
+  });
 };
 
 export const logout = async (req: AuthRequest, res: Response): Promise<void> => {
@@ -109,6 +120,7 @@ export const updateProfile = async (req: AuthRequest, res: Response): Promise<vo
       where: { id: req.user.userId },
       data: validated as ProfileInput,
     });
+    invalidateUserCache(req.user.userId);
     const { passwordHash, ...safeUser } = user;
     res.json({ message: 'Perfil atualizado', data: safeUser });
   } catch (error: any) {
@@ -129,5 +141,6 @@ export const changePassword = async (req: AuthRequest, res: Response): Promise<v
   const newPasswordHash = await hashPassword(newPassword);
 
   await prisma.user.update({ where: { id: req.user.userId }, data: { passwordHash: newPasswordHash } });
+  invalidateUserCache(req.user.userId);
   res.json({ message: 'Senha alterada com sucesso' });
 };

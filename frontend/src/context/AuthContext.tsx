@@ -105,7 +105,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setUser(user);
       navigate('/dashboard');
     } catch (err) {
-      setError('Erro ao registrar usuário');
+      const message = err instanceof AxiosError
+        ? (err.response?.data?.error || err.response?.data?.details?.[0]?.message || 'Erro ao registrar usuário')
+        : (err instanceof Error ? err.message : 'Erro ao registrar usuário');
+      setError(message);
       throw err;
     } finally {
       setIsLoading(false);

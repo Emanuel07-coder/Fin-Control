@@ -70,6 +70,7 @@ export const getTransactions = async (req: AuthRequest, res: Response): Promise<
   const [transactions, total] = await Promise.all([
     prisma.transaction.findMany({
       where,
+      include: { category: true },
       orderBy: { date: 'desc' },
       skip,
       take: limit,
@@ -128,22 +129,23 @@ export const createTransaction = async (req: AuthRequest, res: Response): Promis
       date: new Date(validated.date),
       recurrence: validated.recurrence,
     },
+    include: { category: true },
   });
 
   // Recorrência: gerar próximas transações (até 12)
   if (validated.recurrence !== 'NONE') {
     const baseDate = new Date(validated.date);
-    let nextDate = new Date(baseDate);
     for (let i = 1; i <= 12; i++) {
+      const nextDate = new Date(baseDate.getTime());
       switch (validated.recurrence) {
         case 'DAILY':
-          nextDate.setDate(nextDate.getDate() + 1);
+          nextDate.setDate(baseDate.getDate() + i);
           break;
         case 'WEEKLY':
-          nextDate.setDate(nextDate.getDate() + 7);
+          nextDate.setDate(baseDate.getDate() + (i * 7));
           break;
         case 'MONTHLY':
-          nextDate.setMonth(nextDate.getMonth() + 1);
+          nextDate.setMonth(baseDate.getMonth() + i);
           break;
       }
       if (nextDate.getFullYear() > baseDate.getFullYear() + 1) break;
@@ -156,7 +158,7 @@ export const createTransaction = async (req: AuthRequest, res: Response): Promis
           amount: validated.amount,
           description: `[REC #${i}] ${validated.description || 'Recorrente'}`,
           date: nextDate,
-          recurrence: validated.recurrence,
+          recurrence: 'NONE',
         },
       });
     }
@@ -220,6 +222,7 @@ export const updateTransaction = async (req: AuthRequest, res: Response): Promis
       date: validated.date ? new Date(validated.date) : undefined,
       recurrence: validated.recurrence,
     },
+    include: { category: true },
   });
 
   res.json({

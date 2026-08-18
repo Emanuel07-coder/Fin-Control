@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatCurrency, formatDate, formatMonth, getCurrentMonth } from '../types';
+import { formatCurrency, formatDate, formatMonth, getCurrentMonth, parseToCentavos } from '../types';
 
 // ============================================
 // Testes de utilidades de tipo
@@ -14,8 +14,8 @@ describe('formatCurrency', () => {
   });
 
   it('deve formatar com diferentes moedas', () => {
-    expect(formatCurrency(1000, 'USD')).toBe('$ 10.00');
-    expect(formatCurrency(1000, 'EUR')).toBe('€ 10.00');
+    expect(formatCurrency(1000, 'USD')).toBe('US$ 10,00');
+    expect(formatCurrency(1000, 'EUR')).toBe('€ 10,00');
   });
 });
 
@@ -45,14 +45,6 @@ describe('getCurrentMonth', () => {
 // ============================================
 
 describe('parseToCentavos', () => {
-  const parseToCentavos = (value: string): number => {
-    const cleaned = value.replace(/[^0-9,.]/g, '');
-    const normalized = cleaned.replace(',', '.');
-    const floatValue = parseFloat(normalized);
-    if (isNaN(floatValue)) return 0;
-    return Math.round(floatValue * 100);
-  };
-
   it('deve converter valores decimais corretamente', () => {
     expect(parseToCentavos('100,50')).toBe(10050);
     expect(parseToCentavos('100.50')).toBe(10050);

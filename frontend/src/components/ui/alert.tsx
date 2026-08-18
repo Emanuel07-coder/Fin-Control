@@ -76,7 +76,7 @@ export const BudgetAlertBadge: React.FC<BudgetAlertBadgeProps> = ({ level, spent
   const labels = {
     ok: 'No orçamento',
     warning: `${percentage}% usado`,
-    danger: `${percentage}%超额!`,
+    danger: `${percentage}% (Excedido!)`,
   };
 
   return (

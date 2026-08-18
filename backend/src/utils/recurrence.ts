@@ -16,7 +16,7 @@ export const getNextDate = (currentDate: Date, recurrence: RecurrenceType): Date
     return null;
   }
 
-  const next = new Date(currentDate);
+  const next = new Date(currentDate.getTime());
 
   switch (recurrence) {
     case 'DAILY':
@@ -60,8 +60,13 @@ export const generateRecurringTransactions = async (
 
   for (const tx of recurring) {
     const nextDate = getNextDate(new Date(tx.date), tx.recurrence);
-
     if (!nextDate) continue;
+
+    const startOfDay = new Date(nextDate.getTime());
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(nextDate.getTime());
+    endOfDay.setHours(23, 59, 59, 999);
 
     // Verificar se já existe uma transação para a próxima data
     const exists = await prisma.transaction.findFirst({
@@ -70,15 +75,15 @@ export const generateRecurringTransactions = async (
         categoryId: tx.categoryId,
         type: tx.type,
         date: {
-          gte: new Date(nextDate.setHours(0, 0, 0, 0)),
-          lt: new Date(nextDate.setHours(23, 59, 59, 999)),
+          gte: startOfDay,
+          lte: endOfDay,
         },
       },
     });
 
     if (exists) continue;
 
-    // Criar a próxima transação
+    // Criar a próxima transação (como ocorrência pontual)
     await prisma.transaction.create({
       data: {
         userId,
@@ -87,11 +92,12 @@ export const generateRecurringTransactions = async (
         amount: tx.amount,
         description: tx.description,
         date: nextDate,
-        recurrence: tx.recurrence,
+        recurrence: 'NONE',
       },
     });
 
     created++;
+    if (created >= limit) break;
   }
 
   return created;
@@ -108,3 +114,4 @@ export const processRecurringTransactions = async (userId: string): Promise<void
     console.log(`Created ${created} recurring transactions for user ${userId}`);
   }
 };
+

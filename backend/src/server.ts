@@ -1,16 +1,23 @@
 import app from './utils/app';
+import prisma from './config/database';
 
-// Garante que PORT seja sempre um número
-const PORT = Number(process.env.PORT) || 3000;
-const HOST = '0.0.0.0';
+const PORT = Number(process.env.PORT) || 3001;
 
-console.log('=================================');
-console.log('Starting FinControl Backend...');
-console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
-console.log(`Port: ${PORT}`);
-console.log('=================================');
+const startServer = async (): Promise<void> => {
+  try {
+    await prisma.$connect();
+    console.log('📦 Conectado ao banco de dados com sucesso');
 
-app.listen(PORT, HOST, () => {
-  console.log(`🚀 Server running on http://${HOST}:${PORT}`);
-  console.log(`📊 Health check: http://${HOST}:${PORT}/api/health`);
-});
+    app.listen(PORT, '0.0.0.0', () => {
+      console.log(`🚀 Servidor rodando na porta ${PORT}`);
+      const appUrl = process.env.APP_URL || `http://localhost:${PORT}`;
+      console.log(`🌐 URL: ${appUrl}`);
+    });
+  } catch (error) {
+    console.error('❌ Erro crítico ao iniciar o servidor:', error);
+    process.exit(1);
+  }
+};
+
+startServer();
+

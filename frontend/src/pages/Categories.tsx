@@ -5,7 +5,11 @@ import { Input } from '../components/ui/input';
 import { Modal } from '../components/ui/modal';
 import { Alert } from '../components/ui/alert';
 import { PageSkeleton } from '../components/ui/skeleton';
-import { Plus, Trash2, Edit, Tag } from 'lucide-react';
+import { 
+  Plus, Trash2, Edit, Tag, Utensils, Car, Home, HeartPulse, 
+  BookOpen, Gamepad2, ShoppingBag, Repeat, TrendingUp, 
+  MoreHorizontal, CreditCard, Coffee, Heart, Gift, Zap, Wallet, LucideIcon 
+} from 'lucide-react';
 import { motion } from 'framer-motion';
 import { CategoryFormData, Category } from '../types';
 import { useForm } from 'react-hook-form';
@@ -22,11 +26,37 @@ const COLORS = [
   '#06B6D4', // Cyan
 ];
 
-// Ícones disponíveis (nomes Lucide)
-const ICONS = [
-  'home', 'credit-card', 'coffee', 'utensils', 'car', 'heart',
-  'shopping-cart', 'book', 'graduation-cap', 'gift', 'zap', 'dollar-sign',
-];
+// Mapa de ícones Lucide
+export const CATEGORY_ICON_MAP: Record<string, LucideIcon> = {
+  'utensils': Utensils,
+  'car': Car,
+  'home': Home,
+  'heart-pulse': HeartPulse,
+  'book-open': BookOpen,
+  'gamepad-2': Gamepad2,
+  'shopping-bag': ShoppingBag,
+  'repeat': Repeat,
+  'trending-up': TrendingUp,
+  'more-horizontal': MoreHorizontal,
+  'credit-card': CreditCard,
+  'coffee': Coffee,
+  'heart': Heart,
+  'gift': Gift,
+  'zap': Zap,
+  'wallet': Wallet,
+  'tag': Tag,
+};
+
+export const CategoryIcon: React.FC<{ name?: string; className?: string; style?: React.CSSProperties }> = ({ 
+  name, 
+  className = 'w-5 h-5', 
+  style 
+}) => {
+  const IconComponent = (name && CATEGORY_ICON_MAP[name]) || Tag;
+  return <IconComponent className={className} style={style} />;
+};
+
+const ICONS = Object.keys(CATEGORY_ICON_MAP);
 
 // Form para categoria
 const CategoryForm: React.FC<{
@@ -83,19 +113,19 @@ const CategoryForm: React.FC<{
       {/* Ícone */}
       <div>
         <label className="block text-sm text-paper-dark/60 mb-2">Ícone</label>
-        <div className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-6 gap-2 max-h-40 overflow-y-auto p-1">
           {ICONS.map((iconName) => (
             <button
               key={iconName}
               type="button"
               onClick={() => setSelectedIcon(iconName)}
-              className={`p-2 rounded-lg border transition-all ${
+              className={`p-2.5 rounded-lg border flex items-center justify-center transition-all ${
                 selectedIcon === iconName
-                  ? 'border-gold-accent bg-gold-accent/10'
-                  : 'border-charcoal-lighter hover:border-charcoal-lighter'
+                  ? 'border-gold-accent bg-gold-accent/20 text-gold-accent'
+                  : 'border-charcoal-lighter text-paper-dark/60 hover:text-paper-dark hover:border-charcoal-lighter'
               }`}
             >
-              <Tag className="w-5 h-5 text-paper-dark" data-lucide={iconName} />
+              <CategoryIcon name={iconName} className="w-5 h-5" />
             </button>
           ))}
         </div>
@@ -109,9 +139,9 @@ const CategoryForm: React.FC<{
             className="p-2 rounded-full"
             style={{ backgroundColor: `${selectedColor}30` }}
           >
-            <Tag className="w-5 h-5" style={{ color: selectedColor }} />
+            <CategoryIcon name={selectedIcon} className="w-5 h-5" style={{ color: selectedColor }} />
           </div>
-          <span className="text-paper-dark">Nome da Categoria</span>
+          <span className="text-paper-dark">Exemplo de Categoria</span>
         </div>
       </div>
       
@@ -162,7 +192,7 @@ const Categories: React.FC = () => {
       alert('Categorias padrão não podem ser excluídas');
       return;
     }
-    if (confirm('Tem certeza que deseja excluir?')) {
+    if (confirm('Tem certeza que deseja excluir esta categoria?')) {
       try {
         await deleteMutation.mutateAsync(id);
       } catch (err) {
@@ -230,19 +260,19 @@ const Categories: React.FC = () => {
           <h2 className="text-lg font-display font-bold text-paper-dark mb-4">
             Categorias Padrão
           </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {defaultCategories.map((cat) => (
               <div
                 key={cat.id}
                 className="flex items-center gap-3 p-4 rounded-xl bg-charcoal-light/50 border border-charcoal-lighter"
               >
                 <div 
-                  className="p-2 rounded-full"
+                  className="p-2.5 rounded-full"
                   style={{ backgroundColor: `${cat.color}30` }}
                 >
-                  <Tag className="w-4 h-4" style={{ color: cat.color }} />
+                  <CategoryIcon name={cat.icon} className="w-4 h-4" style={{ color: cat.color }} />
                 </div>
-                <span className="text-paper-dark text-sm truncate">{cat.name}</span>
+                <span className="text-paper-dark text-sm font-medium truncate">{cat.name}</span>
               </div>
             ))}
           </div>
@@ -255,7 +285,7 @@ const Categories: React.FC = () => {
           Suas Categorias
         </h2>
         {userCategories.length > 0 ? (
-          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {userCategories.map((cat) => (
               <motion.div
                 key={cat.id}
@@ -264,26 +294,28 @@ const Categories: React.FC = () => {
                 className="group relative flex items-center gap-3 p-4 rounded-xl bg-charcoal-light/50 border border-charcoal-lighter hover:border-gold-accent/30 transition-all"
               >
                 <div 
-                  className="p-2 rounded-full"
+                  className="p-2.5 rounded-full"
                   style={{ backgroundColor: `${cat.color}30` }}
                 >
-                  <Tag className="w-4 h-4" style={{ color: cat.color }} />
+                  <CategoryIcon name={cat.icon} className="w-4 h-4" style={{ color: cat.color }} />
                 </div>
-                <span className="text-paper-dark text-sm truncate">{cat.name}</span>
+                <span className="text-paper-dark text-sm font-medium truncate">{cat.name}</span>
                 
-                {/* Ações (apenas para não-padrão) */}
-                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                {/* Ações */}
+                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 bg-near-black/80 rounded-lg p-0.5">
                   <button
                     onClick={() => openEditModal(cat)}
-                    className="p-1 rounded hover:bg-charcoal-lighter"
+                    className="p-1.5 rounded hover:bg-charcoal-lighter"
+                    title="Editar"
                   >
-                    <Edit className="w-4 h-4 text-paper-dark/60" />
+                    <Edit className="w-3.5 h-3.5 text-paper-dark/60 hover:text-gold-accent" />
                   </button>
                   <button
                     onClick={() => handleDelete(cat.id, cat.isDefault)}
-                    className="p-1 rounded hover:bg-red-900/20"
+                    className="p-1.5 rounded hover:bg-red-900/20"
+                    title="Excluir"
                   >
-                    <Trash2 className="w-4 h-4 text-red-400" />
+                    <Trash2 className="w-3.5 h-3.5 text-red-400" />
                   </button>
                 </div>
               </motion.div>
