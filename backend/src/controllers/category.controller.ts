@@ -1,76 +1,85 @@
 import { Request, Response } from 'express';
-import { z, ZodError } from 'zod';
 import prisma from '../config/database';
 import { AppError } from '../utils/AppError';
-import { CategoryInput, CategoryUpdateInput, categorySchema, categoryUpdateSchema } from '../utils/schemas';
+import { 
+  CategoryInput, 
+  CategoryUpdateInput, 
+  categorySchema, 
+  categoryUpdateSchema,
+  categoryFiltersSchema,
+  CategoryFilters
+} from '../utils/schemas';
+import { ZodError } from 'zod';
 
 interface AuthRequest extends Request {
   user?: { userId: string };
 }
-
-interface CategoryFilters {
-  page: number;
-  limit: number;
-}
-
-// Schema de filtros com Zod (forma correta)
-const categoryFiltersSchema = z.object({
-  page: z.coerce.number().int().positive().default(1),
-  limit: z.coerce.number().int().positive().max(100).default(10),
-});
 
 export const getCategories = async (req: AuthRequest, res: Response): Promise<void> => {
   const userId = req.user?.userId;
   if (!userId) throw new AppError('Usuário não autenticado', 401);
 
   // Validar query params com Zod
-  const filters = categoryFiltersSchema.parse(req.query);
+  let filters: CategoryFilters;
+  try {
+    filters = categoryFiltersSchema.parse(req.query);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      throw new AppError('Parâmetros de filtro inválidos', 400);
+    }
+    throw error;
+  }
+
   const { page, limit } = filters;
   const skip = (page - 1) * limit;
 
-  try {
-    const [categories, total] = await Promise.all([
-      prisma.category.findMany({
-        where: {
-          OR: [
-            { userId },
-            { isDefault: true },
-          ],
-        },
-        orderBy: { name: 'asc' },
-        skip,
-        take: limit,
-      }),
-      prisma.category.count({
-        where: {
-          OR: [
-            { userId },
-            { isDefault: true },
-          ],
-        },
-      }),
-    ]);
-
-    res.json({
-      message: 'Categorias carregadas',
-      data: categories,
-      pagination: {
-        page,
-        limit,
-        total,
+  const [categories, total] = await Promise.all([
+    prisma.category.findMany({
+      where: {
+        OR: [
+          { userId },
+          { isDefault: true },
+        ],
       },
-    });
-  } catch (error) {
-    console.error('Erro ao buscar categorias:', error);
-    throw error;
-  }
+      orderBy: { name: 'asc' },
+      skip,
+      take: limit,
+    }),
+    prisma.category.count({
+      where: {
+        OR: [
+          { userId },
+          { isDefault: true },
+        ],
+      },
+    }),
+  ]);
+
+  res.json({
+    message: 'Categorias carregadas',
+    data: categories,
+    pagination: {
+      page,
+      limit,
+      total,
+    },
+  });
 };
 
 export const createCategory = async (req: AuthRequest, res: Response): Promise<void> => {
   const userId = req.user?.userId;
   if (!userId) throw new AppError('Usuário não autenticado', 401);
 
-  const validated = categorySchema.parse(req.body);
+  // TD-01: Validação Zod Estrita - usar .parse() obrigatoriamente
+  let validated: CategoryInput;
+  try {
+    validated = categorySchema.parse(req.body);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      throw new AppError('Erro de validação', 400);
+    }
+    throw error;
+  }
 
   const category = await prisma.category.create({
     data: {
@@ -93,7 +102,17 @@ export const updateCategory = async (req: AuthRequest, res: Response): Promise<v
   if (!userId) throw new AppError('Usuário não autenticado', 401);
 
   const categoryId = String(req.params.id);
-  const validated = categoryUpdateSchema.parse(req.body);
+
+  // TD-01: Validação Zod Estrita - usar .parse() para update
+  let validated: CategoryUpdateInput;
+  try {
+    validated = categoryUpdateSchema.parse(req.body);
+  } catch (error) {
+    if (error instanceof ZodError) {
+      throw new AppError('Erro de validação', 400);
+    }
+    throw error;
+  }
 
   const category = await prisma.category.findUnique({
     where: { id: categoryId },
@@ -103,11 +122,12 @@ export const updateCategory = async (req: AuthRequest, res: Response): Promise<v
     throw new AppError('Categoria não encontrada', 404);
   }
 
+  // TD-09: Verificar ownership - usuário deve ser dono da categoria
   if (category.isDefault) {
     throw new AppError('Categorias padrão não podem ser alteradas', 403);
   }
 
-  if (category.userId && category.userId !== userId) {
+  if (!category.userId || category.userId !== userId) {
     throw new AppError('Categoria não encontrada', 404);
   }
 
@@ -136,14 +156,16 @@ export const deleteCategory = async (req: AuthRequest, res: Response): Promise<v
     throw new AppError('Categoria não encontrada', 404);
   }
 
+  // TD-09: Proteção de Ownership completa
   if (category.isDefault) {
     throw new AppError('Categorias padrão não podem ser excluídas', 403);
   }
 
-  if (category.userId && category.userId !== userId) {
+  if (!category.userId || category.userId !== userId) {
     throw new AppError('Categoria não encontrada', 404);
   }
 
+  // Verificar se existem transações vinculadas a esta categoria
   const transactionCount = await prisma.transaction.count({
     where: { categoryId },
   });
@@ -155,6 +177,7 @@ export const deleteCategory = async (req: AuthRequest, res: Response): Promise<v
     );
   }
 
+  // Verificar se existem budgets vinculados a esta categoria
   const budgetCount = await prisma.budget.count({
     where: { categoryId },
   });

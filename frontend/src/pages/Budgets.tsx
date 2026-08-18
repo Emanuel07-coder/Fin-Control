@@ -2,16 +2,17 @@ import React, { useState } from 'react';
 import { useBudgets, useUpsertBudget, useDeleteBudget } from '../hooks/useBudgets';
 import { useCategories } from '../hooks/useCategories';
 import { useDashboard } from '../hooks/useDashboard';
-import { useThemeStore } from '../store/themeStore';
+import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Modal } from '../components/ui/modal';
 import { Alert, BudgetAlertBadge } from '../components/ui/alert';
 import { PageSkeleton } from '../components/ui/skeleton';
-import { Plus, Trash2, Wallet } from 'lucide-react';
+import { Plus, Trash2, Edit, Wallet } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { BudgetFormData, formatCurrency, formatMonth, getCurrentMonth, Budget } from '../types';
 import { useForm } from 'react-hook-form';
+import { CategoryIcon } from './Categories';
 
 // Obter lista de meses para seleção
 const getMonthOptions = () => {
@@ -33,7 +34,7 @@ const BudgetForm: React.FC<{
   onCancel: () => void;
   isLoading?: boolean;
 }> = ({ initialData, onSubmit, onCancel, isLoading }) => {
-  const { register, handleSubmit } = useForm<BudgetFormData>({
+  const { register, handleSubmit, formState: { errors } } = useForm<BudgetFormData>({
     defaultValues: initialData ? {
       categoryId: initialData.categoryId,
       amount: initialData.amount ? initialData.amount / 100 : undefined,
@@ -48,7 +49,7 @@ const BudgetForm: React.FC<{
   const handleFormSubmit = (data: BudgetFormData) => {
     onSubmit({
       ...data,
-      amount: Math.round(data.amount * 100), // Converter para centavos
+      amount: Math.round(Number(data.amount) * 100), // Converter para centavos
     });
   };
   
@@ -58,7 +59,7 @@ const BudgetForm: React.FC<{
       <div>
         <label className="block text-sm text-paper-dark/60 mb-2">Categoria</label>
         <select
-          {...register('categoryId', { required: true })}
+          {...register('categoryId', { required: 'Categoria é obrigatória' })}
           className="w-full p-3 rounded-lg bg-charcoal-light border border-charcoal-lighter text-paper-dark"
         >
           <option value="">Selecione...</option>
@@ -68,13 +69,16 @@ const BudgetForm: React.FC<{
             </option>
           ))}
         </select>
+        {errors.categoryId && (
+          <span className="text-sm text-red-400">{errors.categoryId.message}</span>
+        )}
       </div>
       
       {/* Mês */}
       <div>
         <label className="block text-sm text-paper-dark/60 mb-2">Mês</label>
         <select
-          {...register('month', { required: true })}
+          {...register('month', { required: 'Mês é obrigatório' })}
           className="w-full p-3 rounded-lg bg-charcoal-light border border-charcoal-lighter text-paper-dark"
         >
           {monthOptions.map((m) => (
@@ -83,17 +87,27 @@ const BudgetForm: React.FC<{
             </option>
           ))}
         </select>
+        {errors.month && (
+          <span className="text-sm text-red-400">{errors.month.message}</span>
+        )}
       </div>
       
       {/* Valor */}
       <div>
-        <label className="block text-sm text-paper-dark/60 mb-2">Valor</label>
+        <label className="block text-sm text-paper-dark/60 mb-2">Valor Limite (R$)</label>
         <Input
           type="number"
           step="0.01"
           placeholder="0,00"
-          {...register('amount', { required: true, min: 0.01, valueAsNumber: true })}
+          {...register('amount', { 
+            required: 'Valor é obrigatório', 
+            min: { value: 0.01, message: 'Valor deve ser maior que zero' }, 
+            valueAsNumber: true 
+          })}
         />
+        {errors.amount && (
+          <span className="text-sm text-red-400">{errors.amount.message}</span>
+        )}
       </div>
       
       {/* Botões */}
@@ -110,7 +124,8 @@ const BudgetForm: React.FC<{
 };
 
 const Budgets: React.FC = () => {
-  const { currency } = useThemeStore();
+  const { user } = useAuth();
+  const currency = user?.currency || 'BRL';
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null);
@@ -121,12 +136,8 @@ const Budgets: React.FC = () => {
   const upsertMutation = useUpsertBudget();
   const deleteMutation = useDeleteBudget();
   
-  const getCategoryName = (categoryId: string) => {
-    return categories?.find(c => c.id === categoryId)?.name || 'Sem categoria';
-  };
-  
-  const getCategoryColor = (categoryId: string) => {
-    return categories?.find(c => c.id === categoryId)?.color || '#D4AF37';
+  const getCategory = (categoryId: string) => {
+    return categories?.find(c => c.id === categoryId);
   };
   
   const getAlert = (categoryId: string, month: string) => {
@@ -151,6 +162,11 @@ const Budgets: React.FC = () => {
         console.error('Erro ao excluir:', err);
       }
     }
+  };
+
+  const openEditModal = (budget: Budget) => {
+    setEditingBudget(budget);
+    setIsModalOpen(true);
   };
   
   // Loading
@@ -211,54 +227,57 @@ const Budgets: React.FC = () => {
       {dashboard?.alerts && dashboard.alerts.length > 0 && (
         <div className="max-w-7xl mx-auto mb-8">
           <h2 className="text-lg font-display font-bold text-paper-dark mb-4">
-            Alertas
+            Alertas de Limite
           </h2>
           <div className="space-y-2">
-            {dashboard.alerts.map((alert, index) => (
-              <div
-                key={`${alert.budgetId}-${index}`}
-                className="flex items-center justify-between p-4 rounded-lg bg-charcoal-light/50 border border-charcoal-lighter"
-              >
-                <div className="flex items-center gap-3">
-                  <div 
-                    className="p-2 rounded-full"
-                    style={{ backgroundColor: `${getCategoryColor(alert.categoryId)}30` }}
-                  >
-                    <Wallet className="w-4 h-4" style={{ color: getCategoryColor(alert.categoryId) }} />
-                  </div>
-                  <div>
-                    <p className="text-paper-dark font-medium">
-                      {getCategoryName(alert.categoryId)}
-                    </p>
-                    <p className="text-sm text-paper-dark/60">
-                      {formatMonth(alert.month)}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <div className="text-right">
-                    <p className="text-paper-dark">
-                      {formatCurrency(alert.spent, currency)} / {formatCurrency(alert.total, currency)}
-                    </p>
-                    <div className="w-24 h-1.5 bg-charcoal-lighter rounded-full mt-1">
-                      <div 
-                        className={`h-full rounded-full ${
-                          alert.level === 'danger' ? 'bg-red-500' :
-                          alert.level === 'warning' ? 'bg-burgundy-text' :
-                          'bg-emerald-text'
-                        }`}
-                        style={{ width: `${Math.min((alert.spent / alert.total) * 100, 100)}%` }}
-                      />
+            {dashboard.alerts.map((alert, index) => {
+              const category = getCategory(alert.categoryId);
+              return (
+                <div
+                  key={`${alert.budgetId}-${index}`}
+                  className="flex items-center justify-between p-4 rounded-xl bg-charcoal-light/50 border border-charcoal-lighter"
+                >
+                  <div className="flex items-center gap-3">
+                    <div 
+                      className="p-2.5 rounded-full"
+                      style={{ backgroundColor: `${category?.color || '#D4AF37'}25` }}
+                    >
+                      <CategoryIcon name={category?.icon} className="w-4 h-4" style={{ color: category?.color || '#D4AF37' }} />
+                    </div>
+                    <div>
+                      <p className="text-paper-dark font-medium">
+                        {category?.name || 'Categoria'}
+                      </p>
+                      <p className="text-xs text-paper-dark/60">
+                        {formatMonth(alert.month)}
+                      </p>
                     </div>
                   </div>
-                  <BudgetAlertBadge 
-                    level={alert.level} 
-                    spent={alert.spent} 
-                    total={alert.total} 
-                  />
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <p className="text-paper-dark text-sm font-medium">
+                        {formatCurrency(alert.spent, currency)} / {formatCurrency(alert.total, currency)}
+                      </p>
+                      <div className="w-28 h-1.5 bg-charcoal-lighter rounded-full mt-1.5 overflow-hidden">
+                        <div 
+                          className={`h-full rounded-full ${
+                            alert.level === 'danger' ? 'bg-red-500' :
+                            alert.level === 'warning' ? 'bg-burgundy-text' :
+                            'bg-emerald-text'
+                          }`}
+                          style={{ width: `${Math.min((alert.spent / alert.total) * 100, 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                    <BudgetAlertBadge 
+                      level={alert.level} 
+                      spent={alert.spent} 
+                      total={alert.total} 
+                    />
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -274,25 +293,26 @@ const Budgets: React.FC = () => {
               <div className="grid gap-4">
                 {budgetsByMonth[month].map((budget) => {
                   const alert = getAlert(budget.categoryId, budget.month);
+                  const category = budget.category || getCategory(budget.categoryId);
                   return (
                     <motion.div
                       key={budget.id}
                       initial={{ opacity: 0, scale: 0.95 }}
                       animate={{ opacity: 1, scale: 1 }}
-                      className="flex items-center justify-between p-4 rounded-xl bg-charcoal-light/50 border border-charcoal-lighter hover:border-gold-accent/30 transition-all"
+                      className="flex items-center justify-between p-4 rounded-xl bg-charcoal-light/50 border border-charcoal-lighter hover:border-gold-accent/30 transition-all group"
                     >
                       <div className="flex items-center gap-3">
                         <div 
-                          className="p-2 rounded-full"
-                          style={{ backgroundColor: `${getCategoryColor(budget.categoryId)}30` }}
+                          className="p-2.5 rounded-full"
+                          style={{ backgroundColor: `${category?.color || '#D4AF37'}25` }}
                         >
-                          <Wallet className="w-5 h-5" style={{ color: getCategoryColor(budget.categoryId) }} />
+                          <CategoryIcon name={category?.icon} className="w-4 h-4" style={{ color: category?.color || '#D4AF37' }} />
                         </div>
                         <div>
-                          <p className="text-paper-dark font-medium">
-                            {getCategoryName(budget.categoryId)}
+                          <p className="text-paper-dark font-medium text-sm">
+                            {category?.name || 'Categoria'}
                           </p>
-                          <p className="text-sm text-paper-dark/60">
+                          <p className="text-xs text-paper-dark/60">
                             {formatMonth(budget.month)}
                           </p>
                         </div>
@@ -300,7 +320,7 @@ const Budgets: React.FC = () => {
                       
                       <div className="flex items-center gap-4">
                         <div className="text-right">
-                          <p className="text-paper-dark font-display font-bold">
+                          <p className="text-paper-dark font-display font-bold text-base">
                             {formatCurrency(budget.amount, currency)}
                           </p>
                           {alert && (
@@ -312,12 +332,22 @@ const Budgets: React.FC = () => {
                           )}
                         </div>
                         
-                        <button
-                          onClick={() => handleDelete(budget.id)}
-                          className="p-2 rounded-lg hover:bg-red-900/20 text-paper-dark/40 hover:text-red-400 transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button
+                            onClick={() => openEditModal(budget)}
+                            className="p-1.5 rounded-lg hover:bg-charcoal-lighter text-paper-dark/60 hover:text-gold-accent transition-colors"
+                            title="Editar"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(budget.id)}
+                            className="p-1.5 rounded-lg hover:bg-red-900/20 text-paper-dark/40 hover:text-red-400 transition-colors"
+                            title="Excluir"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </div>
                     </motion.div>
                   );
@@ -351,6 +381,7 @@ const Budgets: React.FC = () => {
         title={editingBudget ? 'Editar Orçamento' : 'Novo Orçamento'}
       >
         <BudgetForm
+          key={editingBudget ? editingBudget.id : 'new'}
           initialData={editingBudget || undefined}
           onSubmit={handleCreateOrUpdate}
           onCancel={() => { setIsModalOpen(false); setEditingBudget(null); }}

@@ -2,10 +2,13 @@ import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useDashboard } from '../hooks/useDashboard';
 import { Button } from '../components/ui/button';
-import { Loader2, TrendingUp, TrendingDown, Wallet, LogOut } from 'lucide-react';
+import { Loader2, TrendingUp, TrendingDown, Wallet, LogOut, ArrowRight } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { formatCurrency } from '../types';
+import { formatCurrency, formatDate } from '../types';
 import { StatsCardSkeleton } from '../components/ui/skeleton';
+import { CategoryIcon } from './Categories';
+import { BudgetAlertBadge } from '../components/ui/alert';
+import { Link } from 'react-router-dom';
 
 // Stats Card with Bento Grid styling
 interface StatsCardProps {
@@ -77,41 +80,28 @@ const EmptyState: React.FC = () => (
     initial={{ opacity: 0, scale: 0.95 }}
     animate={{ opacity: 1, scale: 1 }}
     transition={{ duration: 0.6 }}
-    className="flex flex-col items-center justify-center py-16"
+    className="flex flex-col items-center justify-center py-12"
   >
-    <div className="relative w-32 h-32 mb-6">
+    <div className="relative w-24 h-24 mb-4">
       <motion.div
         animate={{ scale: [1, 1.05, 1] }}
         transition={{ duration: 3, repeat: Infinity }}
-        className="absolute inset-0"
+        className="w-full h-full flex items-center justify-center rounded-full bg-charcoal-light/40 border border-charcoal-lighter"
       >
-        <svg viewBox="0 0 100 100" className="w-full h-full">
-          <circle
-            cx="50"
-            cy="50"
-            r="40"
-            fill="none"
-            stroke="url(#goldGrad)"
-            strokeWidth="0.5"
-            opacity="0.3"
-          />
-          <defs>
-            <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#D4AF37" />
-              <stop offset="100%" stopColor="#B8962F" />
-            </linearGradient>
-          </defs>
-          <path d="M25 55 L50 30 L75 55" fill="none" stroke="#D4AF37" strokeWidth="1" />
-          <path d="M25 55 L50 80 L75 55" fill="none" stroke="#D4AF37" strokeWidth="1" />
-        </svg>
+        <Wallet className="w-10 h-10 text-gold-accent/40" />
       </motion.div>
     </div>
-    <h3 className="text-xl font-display font-bold text-paper-dark mb-2">
-      Suas transações aparecerão aqui
+    <h3 className="text-lg font-display font-bold text-paper-dark mb-1">
+      Nenhuma transação recente
     </h3>
-    <p className="text-paper-dark/60 text-center max-w-sm">
-      Comece adicionando sua primeira transação para acompanhar suas finanças
+    <p className="text-paper-dark/60 text-center max-w-sm text-sm mb-4">
+      Suas movimentações mais recentes aparecerão aqui
     </p>
+    <Link to="/transactions">
+      <Button size="sm" variant="secondary" className="gap-2">
+        Adicionar Transação <ArrowRight className="w-3.5 h-3.5" />
+      </Button>
+    </Link>
   </motion.div>
 );
 
@@ -189,6 +179,9 @@ const Dashboard: React.FC = () => {
     );
   }
 
+  const recentTransactions = dashboard?.recentTransactions || [];
+  const alerts = dashboard?.alerts || [];
+
   return (
     <div className="min-h-screen bg-rich-black p-6 md:p-8">
       {/* Top Navigation */}
@@ -217,7 +210,7 @@ const Dashboard: React.FC = () => {
       </motion.div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto space-y-12">
+      <div className="max-w-7xl mx-auto space-y-8">
         {/* Stats Bento Grid */}
         <motion.div
           variants={containerVariants}
@@ -269,6 +262,60 @@ const Dashboard: React.FC = () => {
           </motion.div>
         </motion.div>
 
+        {/* Alertas de Orçamento Ativos */}
+        {alerts.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="card-premium"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-xl font-display font-bold text-paper-dark">
+                  Alertas de Orçamento
+                </h2>
+                <p className="text-paper-dark/60 text-xs">
+                  Acompanhamento de limites definidos para o mês atual
+                </p>
+              </div>
+              <Link to="/budgets" className="text-xs text-gold-accent hover:text-gold-light flex items-center gap-1 font-medium">
+                Gerenciar Orçamentos <ArrowRight className="w-3 h-3" />
+              </Link>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {alerts.map((alert) => {
+                const category = dashboard?.categories?.find(c => c.id === alert.categoryId);
+                return (
+                  <div
+                    key={alert.budgetId}
+                    className="flex items-center justify-between p-3.5 rounded-xl bg-charcoal-light/40 border border-charcoal-lighter"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div 
+                        className="p-2 rounded-full"
+                        style={{ backgroundColor: `${category?.color || '#D4AF37'}25` }}
+                      >
+                        <CategoryIcon name={category?.icon} className="w-4 h-4" style={{ color: category?.color || '#D4AF37' }} />
+                      </div>
+                      <div>
+                        <p className="text-paper-dark text-sm font-medium">
+                          {category?.name || 'Categoria'}
+                        </p>
+                        <p className="text-xs text-paper-dark/60">
+                          {formatCurrency(alert.spent, currency)} de {formatCurrency(alert.total, currency)}
+                        </p>
+                      </div>
+                    </div>
+                    <BudgetAlertBadge level={alert.level} spent={alert.spent} total={alert.total} />
+                  </div>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+
         {/* Transactions Section */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -276,22 +323,61 @@ const Dashboard: React.FC = () => {
           transition={{ delay: 0.4 }}
           className="card-premium"
         >
-          <div className="mb-6">
-            <h2 className="text-2xl font-display font-bold text-paper-dark mb-1">
-              Transações Recentes
-            </h2>
-            <p className="text-paper-dark/60 text-sm">
-              Suas atividades financeiras mais recentes
-            </p>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-2xl font-display font-bold text-paper-dark mb-1">
+                Transações Recentes
+              </h2>
+              <p className="text-paper-dark/60 text-sm">
+                Suas atividades financeiras mais recentes
+              </p>
+            </div>
+            <Link to="/transactions">
+              <Button variant="secondary" size="sm" className="gap-2">
+                Ver Todas <ArrowRight className="w-3.5 h-3.5" />
+              </Button>
+            </Link>
           </div>
-          <div className="h-px bg-gold-accent/10 mb-6" />
+          <div className="h-px bg-gold-accent/10 mb-4" />
           
-          {dashboard?.budgets && dashboard.budgets.length > 0 ? (
-            <div className="space-y-3">
-              {/* Budget alerts would go here */}
-              <div className="text-paper-dark/60 text-sm">
-                Você tem {dashboard.budgets.length} orçamento(s) configurado(s)
-              </div>
+          {recentTransactions.length > 0 ? (
+            <div className="divide-y divide-charcoal-lighter">
+              {recentTransactions.map((tx) => {
+                const category = tx.category || dashboard?.categories?.find(c => c.id === tx.categoryId);
+                return (
+                  <div
+                    key={tx.id}
+                    className="flex items-center justify-between py-3.5 px-2 hover:bg-charcoal-light/20 rounded-lg transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div 
+                        className="p-2.5 rounded-full"
+                        style={{ backgroundColor: `${category?.color || (tx.type === 'INCOME' ? '#22C55E' : '#EF4444')}25` }}
+                      >
+                        <CategoryIcon 
+                          name={category?.icon} 
+                          className="w-4 h-4" 
+                          style={{ color: category?.color || (tx.type === 'INCOME' ? '#22C55E' : '#EF4444') }} 
+                        />
+                      </div>
+                      <div>
+                        <p className="text-paper-dark font-medium text-sm">
+                          {tx.description || category?.name || 'Transação'}
+                        </p>
+                        <p className="text-xs text-paper-dark/60">
+                          {category?.name || 'Sem categoria'} • {formatDate(tx.date)}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <span className={`text-sm font-display font-bold ${
+                      tx.type === 'INCOME' ? 'text-emerald-text' : 'text-burgundy-text'
+                    }`}>
+                      {tx.type === 'INCOME' ? '+' : '-'}{formatCurrency(tx.amount, currency)}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           ) : (
             <EmptyState />

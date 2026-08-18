@@ -34,7 +34,7 @@ export const setTokens = (access: string | null, refresh: string | null): void =
 export const getAccessToken = (): string | null => accessToken || localStorage.getItem('accessToken');
 export const getRefreshToken = (): string | null => refreshToken || localStorage.getItem('refreshToken');
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 const api = axios.create({
   baseURL: API_URL,
@@ -102,20 +102,16 @@ api.interceptors.response.use(
         refreshToken: currentRefreshToken,
       });
 
-      // ========================================================
-      // ✅ CORREÇÃO CRÍTICA: Acessando data.tokens
-      // ========================================================
       const responseData = response.data as any;
-      const tokens = responseData?.data?.tokens;
+      const data = responseData?.data;
+      const newAccess = data?.tokens?.accessToken || data?.accessToken;
+      const newRefresh = data?.tokens?.refreshToken || data?.refreshToken;
 
-      if (!tokens || !tokens.accessToken) {
-        throw new Error('Resposta de refresh inválida: Tokens não encontrados');
+      if (!newAccess) {
+        throw new Error('Resposta de refresh inválida: Token não encontrado');
       }
 
-      const newAccess = tokens.accessToken;
-      const newRefresh = tokens.refreshToken;
-
-      setTokens(newAccess, newRefresh);
+      setTokens(newAccess, newRefresh || currentRefreshToken);
       processQueue(null, newAccess);
 
       if (originalRequest.headers) {
@@ -123,8 +119,6 @@ api.interceptors.response.use(
       }
       
       return api(originalRequest);
-      // ========================================================
-      
     } catch (refreshError) {
       const err = refreshError instanceof Error ? refreshError : new Error('Refresh failed');
       processQueue(err, null);

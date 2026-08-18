@@ -65,6 +65,7 @@ export interface DashboardData {
   categories: Category[];
   budgets: Budget[];
   alerts: BudgetAlert[];
+  recentTransactions?: Transaction[];
 }
 
 // Pagination
@@ -148,24 +149,47 @@ export interface ChangePasswordFormData {
 // Utilitários
 // ============================================
 
+// Converter string para centavos (inteiro) com suporte a milhar e decimais
+export const parseToCentavos = (value: string): number => {
+  if (!value) return 0;
+  let normalized = String(value).trim();
+  if (normalized.includes('.') && normalized.includes(',')) {
+    if (normalized.indexOf('.') < normalized.indexOf(',')) {
+      // Formato brasileiro: 1.000,50 -> 1000.50
+      normalized = normalized.replace(/\./g, '').replace(',', '.');
+    } else {
+      // Formato americano: 1,000.50 -> 1000.50
+      normalized = normalized.replace(/,/g, '');
+    }
+  } else if (normalized.includes(',')) {
+    normalized = normalized.replace(',', '.');
+  }
+  const cleaned = normalized.replace(/[^0-9.]/g, '');
+  const floatValue = parseFloat(cleaned);
+  if (isNaN(floatValue)) return 0;
+  return Math.round(floatValue * 100);
+};
+
 // Converter centavos para formato de moeda
 export const formatCurrency = (amount: number, currency: string = 'BRL'): string => {
-  return new Intl.NumberFormat('pt-BR', {
+  const formatted = new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency,
   }).format(amount / 100);
+  return formatted.replace(/\u00A0/g, ' ');
 };
 
-// Converter data ISO para formato local
+// Converter data ISO para formato local (UTC resiliente)
 export const formatDate = (dateString: string): string => {
-  return new Date(dateString).toLocaleDateString('pt-BR');
+  const date = new Date(dateString);
+  return date.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
 };
 
 // Converter YYYY-MM para mês/ano
 export const formatMonth = (monthString: string): string => {
   const [year, month] = monthString.split('-');
-  const date = new Date(parseInt(year), parseInt(month) - 1);
-  return date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+  const date = new Date(Date.UTC(parseInt(year), parseInt(month) - 1, 1));
+  return date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 };
 
 // Obter mês atual no formato YYYY-MM

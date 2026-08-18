@@ -38,6 +38,14 @@ export const getMe = async (req: AuthRequest, res: Response): Promise<void> => {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        currency: true,
+        darkMode: true,
+        createdAt: true,
+      },
     });
 
     if (!user) {
@@ -61,6 +69,10 @@ export const exportTransactions = async (req: AuthRequest, res: Response): Promi
   if (!userId) throw new AppError('Usuário não autenticado', 401);
 
   const format = String(req.query.format ?? 'csv').toLowerCase();
+  if (format !== 'pdf' && format !== 'csv') {
+    throw new AppError('Formato inválido. Use pdf ou csv', 400);
+  }
+
   const startDate = req.query.startDate ? new Date(String(req.query.startDate)) : undefined;
   const endDate = req.query.endDate ? new Date(String(req.query.endDate)) : undefined;
 
@@ -113,9 +125,9 @@ export const exportTransactions = async (req: AuthRequest, res: Response): Promi
     
     doc.fontSize(14).text('Resumo', { underline: true });
     doc.fontSize(12);
-    doc.text(`Total de Receitas: R$ ${formatCurrency(totalIncome)}`);
-    doc.text(`Total de Despesas: R$ ${formatCurrency(totalExpense)}`);
-    doc.text(`Saldo: R$ ${formatCurrency(balance)}`);
+    doc.text(`Total de Receitas: ${formatCurrency(totalIncome)}`);
+    doc.text(`Total de Despesas: ${formatCurrency(totalExpense)}`);
+    doc.text(`Saldo: ${formatCurrency(balance)}`);
     doc.moveDown(2);
     
     doc.fontSize(14).text('Transações', { underline: true });
@@ -142,7 +154,7 @@ export const exportTransactions = async (req: AuthRequest, res: Response): Promi
       
       const dateStr = formatDate(new Date(tx.date));
       const typeStr = tx.type === 'INCOME' ? 'Receita' : 'Despesa';
-      const amountStr = `${tx.type === 'INCOME' ? '+' : '-'}R$ ${formatCurrency(tx.amount)}`;
+      const amountStr = `${tx.type === 'INCOME' ? '+' : '-'}${formatCurrency(tx.amount)}`;
       const descStr = tx.description || '-';
       
       doc.text(dateStr, 50, yPosition, { width: 80 });
@@ -165,10 +177,10 @@ export const exportTransactions = async (req: AuthRequest, res: Response): Promi
   const rows = transactions.map((transaction) => {
     const date = transaction.date.toISOString().split('T')[0];
     const type = transaction.type;
-    const amount = formatCurrency(transaction.amount);
-    const category = transaction.category?.name ?? 'Sem categoria';
-    const description = transaction.description?.replace(/[\n,]/g, ' ') ?? '';
-    return `${transaction.id},${date},${type},${category},${amount},${description}`;
+    const amount = (transaction.amount / 100).toFixed(2);
+    const category = (transaction.category?.name ?? 'Sem categoria').replace(/"/g, '""');
+    const description = (transaction.description ?? '').replace(/[\r\n]/g, ' ').replace(/"/g, '""');
+    return `"${transaction.id}","${date}","${type}","${category}","${amount}","${description}"`;
   });
 
   const csv = header + rows.join('\n');
