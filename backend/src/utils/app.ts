@@ -1,5 +1,6 @@
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";  // ← NOVO
 import routes from "../routes";
 import { errorHandler } from "../middleware/error";
 
@@ -11,43 +12,60 @@ const app = express();
 app.set('trust proxy', 1);
 
 // ===========================================================================
-// CORS - ACEITA TODAS AS ORIGINS DA VERCEL (production + preview)
+// 🛡️ HELMET - SEGURANÇA DE BORDA (CSP, HSTS, X-Frame, etc)
+// ===========================================================================
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],  // Tailwind precisa
+      imgSrc: ["'self'", "data:", "https:"],
+      connectSrc: [
+        "'self'",
+        "https://*.supabase.co",
+        "https://fin-control-kohl.vercel.app"
+      ],
+      fontSrc: ["'self'", "data:"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,  // Necessário para Supabase Storage
+  hsts: {
+    maxAge: 31536000,
+    includeSubDomains: true,
+    preload: true,
+  },
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
+}));
+
+// ===========================================================================
+// CORS - ACEITA ORIGINS DA VERCEL (production + preview)
 // ===========================================================================
 const allowedOrigins = [
   // Production
   'https://fin-control-kohl.vercel.app',
   
-  // Regex: aceita QUALQUER preview da Vercel (fin-control-qualquercoisa.vercel.app)
+  // Regex: aceita QUALQUER preview da Vercel
   /^https:\/\/fin-control-.*\.vercel\.app$/,
   
   // Local development
   'http://localhost:5173',
-  'http://localhost:3000',
-  'http://localhost:4173',
 ];
 
 app.use(cors({
   origin: function (origin, callback) {
-    // Permite requisições sem origin (Postman, curl, server-to-server)
     if (!origin) return callback(null, true);
-    
-    // Verifica origins exatas (strings)
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    
-    // Verifica origins por regex
-    const isAllowed = allowedOrigins.some(allowed => {
-      if (allowed instanceof RegExp) {
-        return allowed.test(origin);
-      }
-      return false;
-    });
-    
-    if (isAllowed) {
-      return callback(null, true);
-    }
-    
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    const isAllowed = allowedOrigins.some(allowed => 
+      allowed instanceof RegExp && allowed.test(origin)
+    );
+    if (isAllowed) return callback(null, true);
     console.warn(`❌ CORS bloqueado para origin: ${origin}`);
     return callback(new Error(`Origem ${origin} não permitida pelo CORS`), false);
   },
@@ -57,9 +75,11 @@ app.use(cors({
   maxAge: 86400,
 }));
 
-// Body parser
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// ===========================================================================
+// BODY PARSER COM LIMITE REDUZIDO (proteção contra DoS por payload)
+// ===========================================================================
+app.use(express.json({ limit: '100kb' }));  // era 10mb
+app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 
 // Rotas
 app.use("/api", routes);
