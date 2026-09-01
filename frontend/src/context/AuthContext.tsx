@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode, useCallback, useEffect } from 'react';
-import api, { getRefreshToken, setTokens, getAccessToken } from '../services/api';
+import api, { getRefreshToken, setTokens, getAccessToken, setCsrfToken } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import { AxiosError } from 'axios';
 
@@ -61,10 +61,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const responseData = response.data as any;
       const data = responseData?.data;
 
-      // CORREÇÃO AQUI: Acessando data.tokens.accessToken e data.tokens.refreshToken
       const tokens = data?.tokens;
       const accessToken = tokens?.accessToken || data?.accessToken;
       const refreshToken = tokens?.refreshToken || data?.refreshToken;
+      const csrfToken = data?.csrfToken || responseData?.csrfToken;
       const user = data?.user;
 
       if (!accessToken) {
@@ -72,6 +72,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       }
 
       setTokens(accessToken, refreshToken);
+      setCsrfToken(csrfToken || null);
       setUser(user);
       
       navigate('/dashboard');
@@ -95,13 +96,14 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const responseData = response.data as any;
       const data = responseData?.data;
 
-      // CORREÇÃO AQUI: Aplicando a mesma lógica do login no registro
       const tokens = data?.tokens;
       const accessToken = tokens?.accessToken || data?.accessToken;
       const refreshToken = tokens?.refreshToken || data?.refreshToken;
+      const csrfToken = data?.csrfToken || responseData?.csrfToken;
       const user = data?.user;
 
       setTokens(accessToken, refreshToken);
+      setCsrfToken(csrfToken || null);
       setUser(user);
       navigate('/dashboard');
     } catch (err) {
@@ -117,14 +119,12 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const logout = useCallback(async () => {
     try {
-      const refreshToken = getRefreshToken();
-      if (refreshToken) {
-        await api.post('/auth/logout', { refreshToken });
-      }
+      await api.post('/auth/logout', {}, { withCredentials: true });
     } catch {
       // Silenciando erro de logout
     } finally {
       setTokens(null, null);
+      setCsrfToken(null);
       setUser(null);
       setError(null);
       navigate('/login');
