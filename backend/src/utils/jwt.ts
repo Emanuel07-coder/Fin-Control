@@ -5,25 +5,40 @@ import { AppError } from './AppError';
 const ACCESS_EXP = '15m';
 const REFRESH_EXP = '7d';
 
+const getAccessSecret = (): string => {
+  const secret = process.env.JWT_SECRET ?? process.env.JWT_ACCESS_SECRET;
+  if (!secret) {
+    throw new Error('JWT_SECRET não configurada');
+  }
+  return secret;
+};
+
+const getRefreshSecret = (): string => {
+  const secret = process.env.JWT_REFRESH_SECRET;
+  if (!secret) {
+    throw new Error('JWT_REFRESH_SECRET não configurada');
+  }
+  return secret;
+};
+
 export interface JWTPayload {
   userId: string;
   id: string;
 }
 
 export const signAccessToken = (payload: JWTPayload): string => {
-  // 🛡️ Limpa campos de expiração para evitar erro "Bad options.expiresIn"
   const { exp, iat, nbf, ...cleanPayload } = payload as any;
-  return jwt.sign(cleanPayload, process.env.JWT_SECRET!, { expiresIn: ACCESS_EXP });
+  return jwt.sign(cleanPayload, getAccessSecret(), { expiresIn: ACCESS_EXP });
 };
 
 export const signRefreshToken = (payload: JWTPayload): string => {
   const { exp, iat, nbf, ...cleanPayload } = payload as any;
-  return jwt.sign(cleanPayload, process.env.JWT_REFRESH_SECRET!, { expiresIn: REFRESH_EXP });
+  return jwt.sign(cleanPayload, getRefreshSecret(), { expiresIn: REFRESH_EXP });
 };
 
 export const verifyAccessToken = (token: string): JWTPayload => {
   try {
-    return jwt.verify(token, process.env.JWT_SECRET!) as JWTPayload;
+    return jwt.verify(token, getAccessSecret()) as JWTPayload;
   } catch {
     throw new AppError('Token de acesso inválido ou expirado', 401);
   }
@@ -31,7 +46,7 @@ export const verifyAccessToken = (token: string): JWTPayload => {
 
 export const verifyRefreshToken = async (token: string): Promise<JWTPayload> => {
   try {
-    const decoded = jwt.verify(token, process.env.JWT_REFRESH_SECRET!) as JWTPayload;
+    const decoded = jwt.verify(token, getRefreshSecret()) as JWTPayload;
     const storedToken = await prisma.refreshToken.findUnique({ where: { token } });
 
     if (!storedToken || storedToken.expiresAt < new Date()) {

@@ -9,36 +9,31 @@ interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
   _retry?: boolean;
 }
 
-let accessToken: string | null = localStorage.getItem('accessToken');
-let refreshToken: string | null = localStorage.getItem('refreshToken');
+let accessToken: string | null = null;
+let refreshToken: string | null = null;
+let csrfToken: string | null = null;
 let isRefreshing = false;
 let failedQueue: FailedQueueItem[] = [];
 
 export const setTokens = (access: string | null, refresh: string | null): void => {
   accessToken = access;
   refreshToken = refresh;
-
-  if (access) {
-    localStorage.setItem('accessToken', access);
-  } else {
-    localStorage.removeItem('accessToken');
-  }
-
-  if (refresh) {
-    localStorage.setItem('refreshToken', refresh);
-  } else {
-    localStorage.removeItem('refreshToken');
-  }
 };
 
-export const getAccessToken = (): string | null => accessToken || localStorage.getItem('accessToken');
-export const getRefreshToken = (): string | null => refreshToken || localStorage.getItem('refreshToken');
+export const setCsrfToken = (token: string | null): void => {
+  csrfToken = token;
+};
+
+export const getAccessToken = (): string | null => accessToken;
+export const getRefreshToken = (): string | null => refreshToken;
+export const getCsrfToken = (): string | null => csrfToken;
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 const api = axios.create({
   baseURL: API_URL,
   timeout: 10000,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -49,6 +44,13 @@ api.interceptors.request.use(
     const token = getAccessToken();
     if (token && config.headers) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    if (config.method && !['get', 'head', 'options'].includes(config.method.toLowerCase())) {
+      const currentCsrfToken = getCsrfToken();
+      if (currentCsrfToken && config.headers) {
+        config.headers['X-CSRF-Token'] = currentCsrfToken;
+      }
     }
     return config;
   },
@@ -92,26 +94,25 @@ api.interceptors.response.use(
     isRefreshing = true;
 
     try {
-      const currentRefreshToken = getRefreshToken();
-      if (!currentRefreshToken) {
-        throw new Error('No refresh token available');
-      }
-
-      // Chamada para renovar o token
-      const response = await api.post('/auth/refresh', {
-        refreshToken: currentRefreshToken,
+      const response = await api.post('/auth/refresh', {}, {
+        withCredentials: true,
+        headers: {
+          'X-CSRF-Token': getCsrfToken() ?? '',
+        },
       });
 
       const responseData = response.data as any;
       const data = responseData?.data;
       const newAccess = data?.tokens?.accessToken || data?.accessToken;
       const newRefresh = data?.tokens?.refreshToken || data?.refreshToken;
+      const newCsrfToken = data?.csrfToken || responseData?.csrfToken || getCsrfToken();
 
       if (!newAccess) {
         throw new Error('Resposta de refresh inválida: Token não encontrado');
       }
 
-      setTokens(newAccess, newRefresh || currentRefreshToken);
+      setTokens(newAccess, newRefresh || null);
+      setCsrfToken(newCsrfToken || null);
       processQueue(null, newAccess);
 
       if (originalRequest.headers) {

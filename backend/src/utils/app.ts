@@ -1,6 +1,7 @@
 import express from "express";
 import cors from "cors";
-import helmet from "helmet";  // ← NOVO
+import helmet from "helmet";
+import rateLimit from 'express-rate-limit';
 import routes from "../routes";
 import { errorHandler } from "../middleware/error";
 
@@ -76,9 +77,39 @@ app.use(cors({
 }));
 
 // ===========================================================================
+// RATE LIMIT GLOBAL
+// ===========================================================================
+const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    res.status(429).json({
+      error: 'Muitas requisições. Tente novamente em alguns instantes.',
+    });
+  },
+});
+
+const exportLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: (req, res) => {
+    res.status(429).json({
+      error: 'Muitas exportações. Aguarde 1 minuto antes de solicitar outro relatório.',
+    });
+  },
+});
+
+app.use(apiLimiter);
+app.use('/api/user/export', exportLimiter);
+
+// ===========================================================================
 // BODY PARSER COM LIMITE REDUZIDO (proteção contra DoS por payload)
 // ===========================================================================
-app.use(express.json({ limit: '100kb' }));  // era 10mb
+app.use(express.json({ limit: '100kb' }));
 app.use(express.urlencoded({ extended: true, limit: '100kb' }));
 
 // Rotas
