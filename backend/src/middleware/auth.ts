@@ -4,7 +4,7 @@ import prisma from '../config/database';
 import { AppError } from '../utils/AppError';
 
 interface AuthRequest extends Request {
-  user?: { userId: string };
+  user?: { userId: string; id: string };
 }
 
 interface UserCache {
@@ -31,12 +31,12 @@ setInterval(() => {
 const getCachedUser = async (userId: string): Promise<UserCache | null> => {
   const cached = userCache.get(userId);
   if (cached && cached.expiresAt > Date.now()) return cached;
-  
+
   const user = await prisma.user.findUnique({
     where: { id: userId },
     select: { id: true, name: true, email: true, currency: true, darkMode: true, createdAt: true },
   });
-  
+
   if (!user) return null;
   const userData: UserCache = { ...user, expiresAt: Date.now() + CACHE_TTL };
   userCache.set(userId, userData);
@@ -57,10 +57,10 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
     const token = authHeader.substring(7);
     const payload = verifyAccessToken(token);
     const user = await getCachedUser(payload.userId);
-    
+
     if (!user) throw new AppError('Usuário não encontrado ou conta desativada', 404);
 
-    req.user = { userId: user.id };
+    req.user = { userId: user.id, id: user.id };
     next();
   } catch (error) {
     next(error);
