@@ -60,17 +60,8 @@ export const verifyRefreshToken = async (token: string): Promise<JWTPayload> => 
 };
 
 export const rotateRefreshToken = async (userId: string, oldToken?: string): Promise<string> => {
-  if (oldToken) {
-    await prisma.refreshToken.deleteMany({ where: { token: oldToken } });
-  }
   const payload: JWTPayload = { userId, id: userId };
-  const newRefreshToken = signRefreshToken(payload);
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-
-  await prisma.refreshToken.create({
-    data: { userId, token: newRefreshToken, expiresAt },
-  });
-  return newRefreshToken;
+  return signRefreshToken(payload);
 };
 
 export const revokeAllRefreshTokens = async (userId: string): Promise<void> => {

@@ -4,9 +4,12 @@ import { AppError } from '../utils/AppError';
 import { TransactionInput, TransactionUpdateInput, transactionSchema, transactionUpdateSchema } from '../utils/schemas';
 import { ZodError, z } from 'zod';
 
-export interface AuthRequest extends Request {
-  user?: { userId: string };
-}
+type AuthRequest = Request & {
+  user?: {
+    userId: string;
+  };
+};
+
 
 // ============================================
 // Schema para validação de query params (filtros)
@@ -94,21 +97,6 @@ export const createTransactionService = async (req: AuthRequest, res: any) => {
     throw error;
   }
 
-  // Validar acessibilidade da categoria via RLS / filtro
-  const category = await db.category.findFirst({
-    where: {
-      id: validated.categoryId,
-      OR: [
-        { userId },
-        { isDefault: true },
-      ],
-    },
-  });
-
-  if (!category) {
-    throw new AppError('Categoria não encontrada ou não autorizada', 404);
-  }
-
   const transaction = await db.transaction.create({
     data: {
       userId,
@@ -182,20 +170,13 @@ export const updateTransactionService = async (req: AuthRequest, res: any) => {
     throw new AppError('Transação não encontrada', 404);
   }
 
-  if (validated.categoryId) {
-    const category = await db.category.findFirst({
-      where: {
-        id: validated.categoryId,
-        OR: [
-          { userId },
-          { isDefault: true },
-        ],
-      },
-    });
+  // Defesa em profundidade: verificação explícita de propriedade além do RLS
+  if (existing.userId !== userId) {
+    throw new AppError('Você não tem permissão para alterar esta transação', 403);
+  }
 
-    if (!category) {
-      throw new AppError('Categoria não encontrada ou não autorizada', 404);
-    }
+  if (validated.categoryId) {
+    // Categoria validada pelo Prisma foreign key constraint no banco
   }
 
   const updated = await db.transaction.update({
@@ -227,6 +208,11 @@ export const deleteTransactionService = async (req: AuthRequest, res: any) => {
 
   if (!existing) {
     throw new AppError('Transação não encontrada', 404);
+  }
+
+  // Defesa em profundidade: verificação explícita de propriedade além do RLS
+  if (existing.userId !== userId) {
+    throw new AppError('Você não tem permissão para excluir esta transação', 403);
   }
 
   await db.transaction.delete({

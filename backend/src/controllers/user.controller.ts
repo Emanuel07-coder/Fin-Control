@@ -1,12 +1,10 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
+import { AuthRequest } from '../types/express';
 import prisma from '../config/database';
 import { AppError } from '../utils/AppError';
 import PDFDocument from 'pdfkit';
 import { Transform } from 'stream';
-
-interface AuthRequest extends Request {
-  user?: { userId: string };
-}
+import { revokeUserSessions } from '../utils/token';
 
 // ============================================
 // Utilitários
@@ -17,7 +15,10 @@ const formatCurrency = (value: number): string => {
 };
 
 const formatDate = (date: Date): string => {
-  return date.toLocaleDateString('pt-BR');
+  const day = String(date.getUTCDate()).padStart(2, '0');
+  const month = String(date.getUTCMonth() + 1).padStart(2, '0'); // Months are 0-indexed
+  const year = date.getUTCFullYear();
+  return `${day}/${month}/${year}`;
 };
 
 // ============================================
@@ -189,3 +190,78 @@ export const exportTransactions = async (req: AuthRequest, res: Response): Promi
   res.attachment(`transactions.${format}`);
   res.send(csv);
 };
+
+export const deleteAccount = async (req: AuthRequest, res: Response): Promise<void> => {
+  const userId = req.user?.userId;
+  if (!userId) throw new AppError('Usuário não autenticado', 401);
+
+  // Revoga todas as sessões (refresh tokens) do usuário
+  await revokeUserSessions(userId);
+
+  // Exclui o usuário. O Prisma aplica ON DELETE CASCADE em:
+  // refresh_tokens, categories, transactions e budgets, removendo
+  // todos os dados pessoais associados (conforme LGPD).
+  await prisma.user.delete({
+    where: { id: userId },
+  });
+
+  res.status(200).json({
+    message: 'Conta excluída com sucesso. Todos os dados pessoais foram removidos de forma irreversível.',
+  });
+};
+
+/**
+ * Exportação completa de dados do usuário (LGPD - Direito à Portabilidade)
+ * Retorna todos os dados pessoais vinculados ao usuário em formato JSON.
+ */
+export const exportUserData = async (req: AuthRequest, res: Response): Promise<void> => {
+  const userId = req.user?.userId;
+  if (!userId) throw new AppError('Usuário não autenticado', 401);
+
+  // Buscar todos os dados do usuário em paralelo
+  const [user, categories, transactions, budgets] = await Promise.all([
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        currency: true,
+        darkMode: true,
+        createdAt: true,
+      },
+    }),
+    prisma.category.findMany({
+      where: { userId },
+      orderBy: { name: 'asc' },
+    }),
+    prisma.transaction.findMany({
+      where: { userId },
+      include: { category: true },
+      orderBy: { date: 'desc' },
+    }),
+    prisma.budget.findMany({
+      where: { userId },
+      include: { category: true },
+      orderBy: { month: 'desc' },
+    }),
+  ]);
+
+  if (!user) {
+    throw new AppError('Usuário não encontrado', 404);
+  }
+
+  const exportData = {
+    exportedAt: new Date().toISOString(),
+    user,
+    categories,
+    transactions,
+    budgets,
+  };
+
+  res.setHeader('Content-Type', 'application/json');
+  res.setHeader('Content-Disposition', `attachment; filename=fincontrol-export-${userId}-${new Date().toISOString().split('T')[0]}.json`);
+  res.status(200).json(exportData);
+};
+
+

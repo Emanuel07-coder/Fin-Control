@@ -1,0 +1,52 @@
+npm notice run fincontrol-backend@0.1.0 npx
+npm notice run vitest run --coverage
+Loaded  vitest@5.0.2  and  @vitest/coverage-v8@5.0.3 .
+Running mixed versions is not supported and may lead into bugs
+Update your dependencies and make sure the versions match.
+
+[1m[30m[46m RUN [49m[39m[22m [36mv5.0.2 [39m[90mC:/Users/ronir/Fin-Control/backend[39m
+      [2mCoverage enabled with [22m[33mv8[39m
+
+ [31m❯[39m tests/auth.service.test.ts [2m([22m[2m22 tests[22m[2m | [22m[31m2 failed[39m[2m)[22m[32m 19[2mms[22m[39m
+   [31m❯[39m Auth Service [2m(22)[22m
+     [31m❯[39m refreshService [2m(2)[22m
+[31m       [31m×[31m should refresh tokens when valid refresh token provided[39m[32m 6[2mms[22m[39m
+     [31m❯[39m getProfileService [2m(3)[22m
+[31m       [31m×[31m should return error when user not found[39m[32m 1[2mms[22m[39m
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 2 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/auth.service.test.ts > Auth Service > refreshService > should refresh tokens when valid refresh token provided
+AssertionError: expected "vi.fn()" to be called with arguments: [ { data: { …(3) } } ]
+
+Number of calls: 0
+
+ ❯ tests/auth.service.test.ts:274:46
+    272|       expect(mockRotateRefreshToken).toHaveBeenCalledWith('user-123', …
+    273|       expect(mockPrisma.refreshToken.deleteMany).toHaveBeenCalledWith(…
+    274|       expect(mockPrisma.refreshToken.create).toHaveBeenCalledWith({
+       |                                              ^
+    275|         data: {
+    276|           userId: 'user-123',
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯
+
+ FAIL  tests/auth.service.test.ts > Auth Service > getProfileService > should return error when user not found
+Error: Usuário não encontrado
+ ❯ Module.getProfileService src/services/auth.service.ts:208:20
+    206|     select: { id: true, name: true, email: true, currency: true, darkM…
+    207|   });
+    208|   if (!user) throw new AppError('Usuário não encontrado', 404);
+       |                    ^
+    209|   return { message: 'Perfil carregado', data: user };
+    210| };
+ ❯ tests/auth.service.test.ts:433:7
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m3 passed[39m[22m[90m (4)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m58 passed[39m[22m[90m (60)[39m
+[2m   Start at [22m 12:48:42
+[2m   Duration [22m 3.81s[2m (tests 69%, import 17%, transform 12%, worker 2%)[22m
+

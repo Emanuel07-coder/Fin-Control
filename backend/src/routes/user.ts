@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { asyncHandler } from '../utils/asyncHandler';
 import { authenticateToken } from '../middleware/auth';
-import { getMe, exportTransactions } from '../controllers/user.controller'; // ADICIONADO getMe AQUI
+import { getMe, exportTransactions, exportUserData } from '../controllers/user.controller'; // ADICIONADO getMe AQUI
 
 const router = Router();
 
@@ -14,5 +14,8 @@ router.get('/me', asyncHandler(getMe));
 
 // 2. Rota para exportar transações (Já existia)
 router.get('/export', asyncHandler(exportTransactions));
+
+// 3. Rota para exportação completa de dados do usuário (LGPD - Direito à Portabilidade)
+router.get('/me/export', asyncHandler(exportUserData));
 
 export default router;

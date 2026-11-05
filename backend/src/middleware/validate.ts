@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
-import { AnyZodObject, ZodError } from 'zod';
+import { ZodTypeAny, ZodError } from 'zod';
 
-export const validateBody = (schema: AnyZodObject) => (
+export const validateBody = (schema: ZodTypeAny) => (
   req: Request,
   res: Response,
   next: NextFunction
@@ -16,7 +16,7 @@ export const validateBody = (schema: AnyZodObject) => (
   next();
 };
 
-export const validateQuery = (schema: AnyZodObject) => (
+export const validateQuery = (schema: ZodTypeAny) => (
   req: Request,
   res: Response,
   next: NextFunction
@@ -27,11 +27,11 @@ export const validateQuery = (schema: AnyZodObject) => (
     return;
   }
 
-  req.query = result.data;
+  req.query = result.data as any;
   next();
 };
 
-export const validateParams = (schema: AnyZodObject) => (
+export const validateParams = (schema: ZodTypeAny) => (
   req: Request,
   res: Response,
   next: NextFunction
@@ -42,6 +42,6 @@ export const validateParams = (schema: AnyZodObject) => (
     return;
   }
 
-  req.params = result.data;
+  req.params = result.data as any;
   next();
 };

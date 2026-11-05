@@ -37,6 +37,7 @@ model Category {
   budgets     Budget[]
 
   @@unique([userId, name])
+  @@index([userId])
   @@map("categories")
 }
 
@@ -53,6 +54,9 @@ model Transaction {
   user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   category Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
 
+  @@index([userId])
+  @@index([categoryId])
+  @@index([date])
   @@map("transactions")
 }
 

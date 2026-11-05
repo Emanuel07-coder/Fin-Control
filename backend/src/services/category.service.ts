@@ -1,10 +1,7 @@
 import { Request } from 'express';
+import { AuthRequest } from '../types/express';
 import { prisma, getPrismaWithUser } from '../config/database';
 import { AppError } from '../utils/AppError';
-
-export interface AuthRequest extends Request {
-  user?: { userId: string };
-}
 
 export const getCategoriesService = async (req: AuthRequest, res: any) => {
   const userId = req.user?.userId;
@@ -68,6 +65,11 @@ export const updateCategoryService = async (req: AuthRequest, res: any) => {
     throw new AppError('Categoria não encontrada ou sem permissão para alteração', 404);
   }
 
+  // Defesa em profundidade: verificação explícita de propriedade além do RLS
+  if (existing.userId !== userId) {
+    throw new AppError('Você não tem permissão para alterar esta categoria', 403);
+  }
+
   const updated = await db.category.update({
     where: { id: categoryId },
     data: {
@@ -96,6 +98,11 @@ export const deleteCategoryService = async (req: AuthRequest, res: any) => {
 
   if (!existing) {
     throw new AppError('Categoria não encontrada ou sem permissão para exclusão', 404);
+  }
+
+  // Defesa em profundidade: verificação explícita de propriedade além do RLS
+  if (existing.userId !== userId) {
+    throw new AppError('Você não tem permissão para excluir esta categoria', 403);
   }
 
   await db.category.delete({

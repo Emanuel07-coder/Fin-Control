@@ -22,7 +22,6 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }
             onClick={onClose}
             className="fixed inset-0 bg-rich-black/80 backdrop-blur-sm z-40"
           />
-          
           {/* Container flex para centralizar */}
           <div className="fixed inset-0 flex items-center justify-center p-4 pointer-events-none z-50">
             <motion.div
@@ -40,10 +39,9 @@ export const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children }
                   className="p-2 rounded-lg hover:bg-charcoal-lighter transition-colors"
                   aria-label="Fechar modal"
                 >
-                  <X className="w-5 h-5 text-paper/60" />
+                  <X className="w-5 h-5 text-paper/60" aria-hidden="true" />
                 </button>
               </div>
-              
               {/* Content */}
               <div className="p-6">{children}</div>
             </motion.div>

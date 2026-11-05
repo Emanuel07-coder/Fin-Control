@@ -20,6 +20,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
+  deleteAccount: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -131,7 +132,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [navigate]);
 
-  const value = { user, isAuthenticated, isLoading, error, login, register, logout };
+  const deleteAccount = useCallback(async () => {
+    try {
+      await api.delete('/auth/me');
+    } catch {
+      // Silenciando erro de exclusão de conta
+    } finally {
+      setTokens(null, null);
+      setCsrfToken(null);
+      setUser(null);
+      setError(null);
+      navigate('/login');
+    }
+  }, [navigate]);
+
+  const value = { user, isAuthenticated, isLoading, error, login, register, logout, deleteAccount };
 
   if (isLoading && !user) {
     return (

@@ -124,8 +124,8 @@ const Dashboard: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-rich-black p-4 sm:p-6 md:p-8">
-        <div className="max-w-6xl mx-auto mb-8">
+      <div className="flex-1 w-full overflow-y-auto p-4 sm:p-6 md:p-8">
+        <div className="w-full mb-8">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="text-3xl md:text-4xl font-display font-bold text-paper-dark mb-1">
@@ -137,8 +137,8 @@ const Dashboard: React.FC = () => {
           <div className="h-px bg-gradient-to-r from-gold-accent/20 via-gold-accent/5 to-transparent" />
         </div>
 
-        <div className="max-w-6xl mx-auto space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="w-full space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <StatsCardSkeleton />
             <StatsCardSkeleton />
             <StatsCardSkeleton />
@@ -150,15 +150,15 @@ const Dashboard: React.FC = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-rich-black p-4 sm:p-6 md:p-8">
-        <div className="max-w-6xl mx-auto mb-8">
+      <div className="flex-1 w-full overflow-y-auto p-4 sm:p-6 md:p-8">
+        <div className="w-full mb-8">
           <h1 className="text-3xl md:text-4xl font-display font-bold text-paper-dark mb-1">
             Dashboard
           </h1>
           <div className="h-px bg-gradient-to-r from-gold-accent/20 via-gold-accent/5 to-transparent mt-4" />
         </div>
 
-        <div className="max-w-6xl mx-auto">
+        <div className="w-full">
           <ErrorState message={error.message || 'Erro ao carregar dashboard'} />
         </div>
       </div>
@@ -169,12 +169,12 @@ const Dashboard: React.FC = () => {
   const alerts = dashboard?.alerts || [];
 
   return (
-    <div className="min-h-screen bg-rich-black p-4 sm:p-6 md:p-8">
+    <div className="flex-1 w-full overflow-y-auto p-4 sm:p-6 md:p-8">
       {/* Top Header & Actions */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="max-w-6xl mx-auto mb-8"
+        className="w-full mb-8"
       >
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <div>
@@ -213,13 +213,13 @@ const Dashboard: React.FC = () => {
       </motion.div>
 
       {/* Main Content Container */}
-      <div className="max-w-6xl mx-auto space-y-8">
+      <div className="w-full space-y-8">
         {/* Stats Grid */}
         <motion.div
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="grid grid-cols-1 md:grid-cols-3 gap-6"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
         >
           <StatsCard
             title="Saldo"

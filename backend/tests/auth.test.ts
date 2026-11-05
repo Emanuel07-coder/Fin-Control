@@ -1,23 +1,45 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import app from '../src/utils/app';
 import prisma from '../src/config/database';
-import { hashPassword } from '../src/utils/password';
 
 const BASE_URL = '/api';
 
-// Testes de autenticação
+// Helper para gerar um usuário único por bloco e obter o token diretamente
+const createUniqueTestUser = async (prefix: string) => {
+  const uniqueEmail = `${prefix}-${Date.now()}-${Math.floor(Math.random() * 100000)}@example.com`;
+  const testUser = {
+    name: `${prefix} User`,
+    email: uniqueEmail,
+    password: 'TestPassword123',
+  };
+
+  const response = await request(app)
+    .post(`${BASE_URL}/auth/register`)
+    .send(testUser);
+
+  // Extrai os tokens da resposta do registro
+  const accessToken = response.body?.data?.tokens?.accessToken || response.body?.data?.accessToken;
+  const refreshToken = response.body?.data?.tokens?.refreshToken;
+
+  if (!accessToken) {
+    throw new Error(`Falha ao obter token para ${prefix}: ${JSON.stringify(response.body)}`);
+  }
+
+  return { accessToken, refreshToken, user: response.body?.data?.user, testUser };
+};
+
+// 1. Testes de Autenticação
 describe('Auth Controller', () => {
   const testUser = {
     name: 'Test User',
-    email: `test-${Date.now()}@example.com`,
+    email: `auth-test-${Date.now()}@example.com`,
     password: 'TestPassword123',
   };
 
   afterAll(async () => {
-    // Limpar dados de teste
     await prisma.user.deleteMany({
-      where: { email: { contains: 'test-' } },
+      where: { email: { contains: 'auth-test-' } },
     });
   });
 
@@ -85,7 +107,6 @@ describe('Auth Controller', () => {
 
   describe('POST /auth/refresh', () => {
     it('deve renovar tokens com refresh token válido', async () => {
-      // Primeiro faz login para obter tokens
       const loginResponse = await request(app)
         .post(`${BASE_URL}/auth/login`)
         .send({
@@ -95,7 +116,6 @@ describe('Auth Controller', () => {
 
       const refreshToken = loginResponse.body.data.tokens.refreshToken;
 
-      // Renova tokens
       const response = await request(app)
         .post(`${BASE_URL}/auth/refresh`)
         .send({ refreshToken })
@@ -105,24 +125,113 @@ describe('Auth Controller', () => {
       expect(response.body.data).toHaveProperty('refreshToken');
     });
   });
+
+  describe('GET /auth/profile', () => {
+    it('should return user profile when authenticated', async () => {
+      const session = await createUniqueTestUser('profile-test');
+      const response = await request(app)
+        .get(`${BASE_URL}/auth/profile`)
+        .set('Authorization', `Bearer ${session.accessToken}`)
+        .expect(200);
+
+      expect(response.body.data).toHaveProperty('id', session.user.id);
+      expect(response.body.data).toHaveProperty('email', session.user.email);
+      expect(response.body.data).toHaveProperty('name', session.user.name);
+    });
+
+    it('should return error when user not authenticated', async () => {
+      await request(app)
+        .get(`${BASE_URL}/auth/profile`)
+        .expect(401);
+    });
+  });
+
+  describe('PUT /auth/profile', () => {
+    it('should update user profile', async () => {
+      const session = await createUniqueTestUser('profile-update-test');
+      const response = await request(app)
+        .put(`${BASE_URL}/auth/profile`)
+        .set('Authorization', `Bearer ${session.accessToken}`)
+        .send({ name: 'Updated Name' })
+        .expect(200);
+
+      expect(response.body.data).toHaveProperty('name', 'Updated Name');
+    });
+
+    it('should return error when user not authenticated', async () => {
+      await request(app)
+        .put(`${BASE_URL}/auth/profile`)
+        .send({ name: 'Updated Name' })
+        .expect(401);
+    });
+  });
+
+  describe('POST /auth/change-password', () => {
+    it('should update password', async () => {
+      const session = await createUniqueTestUser('password-test');
+      const response = await request(app)
+        .post(`${BASE_URL}/auth/change-password`)
+        .set('Authorization', `Bearer ${session.accessToken}`)
+        .send({ currentPassword: 'TestPassword123', newPassword: 'NewPassword123' })
+        .expect(200);
+
+      // Assuming the response has a message or something
+      expect(response.body).toHaveProperty('message');
+    });
+
+    it('should return error when user not authenticated', async () => {
+      await request(app)
+        .post(`${BASE_URL}/auth/change-password`)
+        .send({ oldPassword: 'Test', newPassword: 'New' })
+        .expect(401);
+    });
+  });
+
+  describe('POST /auth/logout', () => {
+    it('should logout user', async () => {
+      const session = await createUniqueTestUser('logout-test');
+      const response = await request(app)
+        .post(`${BASE_URL}/auth/logout`)
+        .set('Authorization', `Bearer ${session.accessToken}`)
+        .send({ refreshToken: session.refreshToken }) // Assuming we have refreshToken from session
+        .expect(200);
+
+      expect(response.body).toHaveProperty('message');
+    });
+
+    it('should return error when user not authenticated', async () => {
+      await request(app)
+        .post(`${BASE_URL}/auth/logout`)
+        .expect(401);
+    });
+  });
+
+  describe('POST /auth/logout-all', () => {
+    it('should logout user from all devices', async () => {
+      const session = await createUniqueTestUser('logout-all-test');
+      const response = await request(app)
+        .post(`${BASE_URL}/auth/logout-all`)
+        .set('Authorization', `Bearer ${session.accessToken}`)
+        .expect(200);
+
+      expect(response.body).toHaveProperty('message');
+    });
+
+    it('should return error when user not authenticated', async () => {
+      await request(app)
+        .post(`${BASE_URL}/auth/logout-all`)
+        .expect(401);
+    });
+  });
 });
 
-// Testes de categorías
+// 2. Testes de Categorias
 describe('Categories Controller', () => {
   let authToken: string;
-  const testUser = {
-    name: 'Category Test',
-    email: `category-test-${Date.now()}@example.com`,
-    password: 'TestPassword123',
-  };
 
   beforeAll(async () => {
-    // Criar usuário de teste
-    const response = await request(app)
-      .post(`${BASE_URL}/auth/register`)
-      .send(testUser);
-
-    authToken = response.body.data.tokens.accessToken;
+    const session = await createUniqueTestUser('category-test');
+    authToken = session.accessToken;
   });
 
   afterAll(async () => {
@@ -160,35 +269,33 @@ describe('Categories Controller', () => {
   });
 });
 
-// Testes de transações
+// 3. Testes de Transações
 describe('Transactions Controller', () => {
   let authToken: string;
   let categoryId: string;
-  const testUser = {
-    name: 'Transaction Test',
-    email: `transaction-test-${Date.now()}@example.com`,
-    password: 'TestPassword123',
-  };
 
   beforeAll(async () => {
-    // Criar usuário e obter token
-    const userResponse = await request(app)
-      .post(`${BASE_URL}/auth/register`)
-      .send(testUser);
+    const session = await createUniqueTestUser('tx-test');
+    authToken = session.accessToken;
 
-    authToken = userResponse.body.data.tokens.accessToken;
-
-    // Obter uma categoría padrão
     const categoryResponse = await request(app)
       .get(`${BASE_URL}/categories`)
       .set('Authorization', `Bearer ${authToken}`);
 
-    categoryId = categoryResponse.body.data[0].id;
+    if (categoryResponse.body?.data?.length > 0) {
+      categoryId = categoryResponse.body.data[0].id;
+    } else {
+      const newCat = await request(app)
+        .post(`${BASE_URL}/categories`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ name: 'Tx Category', color: '#00FF00', icon: 'tag' });
+      categoryId = newCat.body.data.id;
+    }
   });
 
   afterAll(async () => {
     await prisma.user.deleteMany({
-      where: { email: { contains: 'transaction-test-' } },
+      where: { email: { contains: 'tx-test-' } },
     });
   });
 
@@ -222,28 +329,28 @@ describe('Transactions Controller', () => {
   });
 });
 
-// Testes de orçamentos
+// 4. Testes de Orçamentos
 describe('Budgets Controller', () => {
   let authToken: string;
   let categoryId: string;
-  const testUser = {
-    name: 'Budget Test',
-    email: `budget-test-${Date.now()}@example.com`,
-    password: 'TestPassword123',
-  };
 
   beforeAll(async () => {
-    const userResponse = await request(app)
-      .post(`${BASE_URL}/auth/register`)
-      .send(testUser);
-
-    authToken = userResponse.body.data.tokens.accessToken;
+    const session = await createUniqueTestUser('budget-test');
+    authToken = session.accessToken;
 
     const categoryResponse = await request(app)
       .get(`${BASE_URL}/categories`)
       .set('Authorization', `Bearer ${authToken}`);
 
-    categoryId = categoryResponse.body.data[0].id;
+    if (categoryResponse.body?.data?.length > 0) {
+      categoryId = categoryResponse.body.data[0].id;
+    } else {
+      const newCat = await request(app)
+        .post(`${BASE_URL}/categories`)
+        .set('Authorization', `Bearer ${authToken}`)
+        .send({ name: 'Budget Category', color: '#0000FF', icon: 'wallet' });
+      categoryId = newCat.body?.data?.id;
+    }
   });
 
   afterAll(async () => {
@@ -298,26 +405,18 @@ describe('Budgets Controller', () => {
   });
 });
 
-// Testes de Dashboard
+// 5. Testes de Dashboard
 describe('Dashboard Controller', () => {
   let authToken: string;
-  const testUser = {
-    name: 'Dashboard Test',
-    email: `dashboard-test-${Date.now()}@example.com`,
-    password: 'TestPassword123',
-  };
 
   beforeAll(async () => {
-    const userResponse = await request(app)
-      .post(`${BASE_URL}/auth/register`)
-      .send(testUser);
-
-    authToken = userResponse.body.data.tokens.accessToken;
+    const session = await createUniqueTestUser('dash-test');
+    authToken = session.accessToken;
   });
 
   afterAll(async () => {
     await prisma.user.deleteMany({
-      where: { email: { contains: 'dashboard-test-' } },
+      where: { email: { contains: 'dash-test-' } },
     });
   });
 
@@ -337,7 +436,7 @@ describe('Dashboard Controller', () => {
     });
 
     it('deve suportar filtro de mês', async () => {
-      const month = '2024-01';
+      const month = '2026-09';
       
       const response = await request(app)
         .get(`${BASE_URL}/dashboard`)
