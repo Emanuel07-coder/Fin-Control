@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: fincontrol
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -d fincontrol"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Instalar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Instalar dependências do backend
+        run: npm ci
+        working-directory: ./backend
+
+      - name: Instalar dependências do frontend
+        run: npm ci
+        working-directory: ./frontend
+
+      - name: Gerar cliente Prisma
+        run: npx prisma generate
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fincontrol?schema=public
+
+      - name: Aplicar migrações Prisma
+        run: npx prisma migrate deploy
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fincontrol?schema=public
+
+      - name: Executar suíte de testes
+        run: npm test
+        working-directory: ./backend
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/fincontrol?schema=public
+          JWT_SECRET: ${{ secrets.JWT_SECRET || 'test-secret-key-for-ci-only-min-32-chars' }}
+          JWT_REFRESH_SECRET: ${{ secrets.JWT_REFRESH_SECRET || 'test-refresh-secret-key-for-ci-only-min-32-chars' }}
+          JWT_ACCESS_SECRET: ${{ secrets.JWT_ACCESS_SECRET || 'test-access-secret-key-for-ci-only-min-32-chars' }}
+          NODE_ENV: test
+
+      - name: Verificação de tipos TypeScript (backend)
+        run: npx tsc --noEmit
+        working-directory: ./backend
+
+      - name: Verificação de tipos TypeScript (frontend)
+        run: npx tsc --noEmit
+        working-directory: ./frontend
+
+      - name: Validação do schema Prisma
+        run: npx prisma validate
+        working-directory: ./backend

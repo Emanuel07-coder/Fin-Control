@@ -1,10 +1,7 @@
 import { Request, Response } from 'express';
+import { AuthRequest } from '../types/express';
 import { getTransactionsService, createTransactionService, updateTransactionService, deleteTransactionService } from '../services/transaction.service';
 import { AppError } from '../utils/AppError';
-
-interface AuthRequest extends Request {
-  user?: { userId: string };
-}
 
 export const getTransactions = async (req: AuthRequest, res: Response): Promise<void> => {
   try {

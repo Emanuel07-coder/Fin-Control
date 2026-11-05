@@ -2,10 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { verifyAccessToken } from '../utils/jwt';
 import prisma from '../config/database';
 import { AppError } from '../utils/AppError';
-
-interface AuthRequest extends Request {
-  user?: { userId: string; id: string };
-}
+import { AuthRequest } from '@/types/express';
 
 interface UserCache {
   id: string;
@@ -60,7 +57,7 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
 
     if (!user) throw new AppError('Usuário não encontrado ou conta desativada', 404);
 
-    req.user = { userId: user.id, id: user.id };
+    req.user = { userId: user.id };
     next();
   } catch (error) {
     next(error);

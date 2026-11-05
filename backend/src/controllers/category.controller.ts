@@ -1,43 +1,28 @@
-import { Request, Response } from 'express';
-import { getCategoriesService, createCategoryService, updateCategoryService, deleteCategoryService } from '../services/category.service';
-import { AppError } from '../utils/AppError';
-
-interface AuthRequest extends Request {
-  user?: { userId: string };
-}
+import { Response } from 'express';
+import { AuthRequest } from '../types/express';
+import {
+  getCategoriesService,
+  createCategoryService,
+  updateCategoryService,
+  deleteCategoryService,
+} from '../services/category.service';
 
 export const getCategories = async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const result = await getCategoriesService(req, res);
-    res.json(result);
-  } catch (error) {
-    throw error;
-  }
+  const result = await getCategoriesService(req, res);
+  res.status(200).json(result);
 };
 
 export const createCategory = async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const result = await createCategoryService(req, res);
-    res.status(result.statusCode || 201).json({ message: result.message, data: result.data });
-  } catch (error) {
-    throw error;
-  }
+  const result = await createCategoryService(req, res);
+  res.status(result.statusCode || 201).json({ message: result.message, data: result.data });
 };
 
 export const updateCategory = async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const result = await updateCategoryService(req, res);
-    res.json({ message: result.message, data: result.data });
-  } catch (error) {
-    throw error;
-  }
+  const result = await updateCategoryService(req, res);
+  res.status(200).json({ message: result.message, data: result.data });
 };
 
 export const deleteCategory = async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    await deleteCategoryService(req, res);
-    res.json({ message: 'Categoria excluída com sucesso' });
-  } catch (error) {
-    throw error;
-  }
+  await deleteCategoryService(req, res);
+  res.status(200).json({ message: 'Categoria excluída com sucesso' });
 };

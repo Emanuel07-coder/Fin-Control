@@ -1,0 +1,10 @@
+import { describe, it, expect } from 'vitest';
+import app from '../src/utils/app';
+
+describe('App Utils', () => {
+  it('should be an instance of express.Application', () => {
+    expect(app).toBeDefined();
+    // We can't test much without supertest, but at least we know it's imported
+    expect(typeof app.listen).toBe('function');
+  });
+});

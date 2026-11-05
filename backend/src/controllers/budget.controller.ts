@@ -1,12 +1,9 @@
 import { Request, Response } from 'express';
+import { AuthRequest } from '../types/express';
 import prisma from '../config/database';
 import { AppError } from '../utils/AppError';
 import { BudgetInput, BudgetUpdateInput, budgetSchema as budgetInputSchema, budgetUpdateSchema } from '../utils/schemas';
 import { ZodError } from 'zod';
-
-interface AuthRequest extends Request {
-  user?: { userId: string };
-}
 
 export const getBudgets = async (req: AuthRequest, res: Response): Promise<void> => {
   const userId = req.user?.userId;

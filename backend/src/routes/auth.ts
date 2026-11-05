@@ -1,14 +1,15 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
-import { 
-  register, 
-  login, 
-  refresh, 
+import {
+  register,
+  login,
+  refresh,
   logout,
   logoutAll,
-  getProfile, 
-  updateProfile, 
-  changePassword 
+  getProfile,
+  updateProfile,
+  changePassword,
+  deleteAccount,
 } from '../controllers/auth.controller';
 import { asyncHandler } from '../utils/asyncHandler';
 import { authenticateToken } from '../middleware/auth';
@@ -21,6 +22,7 @@ const authLimiter = rateLimit({
   message: { error: 'Muitas tentativas. Aguarde 1 minuto', details: [] },
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === 'test',
 });
 
 // ✅ Aplique o asyncHandler em todas as rotas async
@@ -33,5 +35,6 @@ router.post('/logout-all', authenticateToken, asyncHandler(logoutAll));
 router.get('/profile', authenticateToken, asyncHandler(getProfile));
 router.put('/profile', authenticateToken, asyncHandler(updateProfile));
 router.post('/change-password', authenticateToken, asyncHandler(changePassword));
+router.delete('/me', authenticateToken, asyncHandler(deleteAccount));
 
 export default router;

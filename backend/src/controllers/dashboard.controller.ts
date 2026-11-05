@@ -1,11 +1,8 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
+import { AuthRequest } from '../types/express';
 import prisma from '../config/database';
 import { AppError } from '../utils/AppError';
 import { z } from 'zod';
-
-interface AuthRequest extends Request {
-  user?: { userId: string };
-}
 
 interface BudgetAlert {
   budgetId: string;
@@ -51,7 +48,7 @@ export const getDashboard = async (req: AuthRequest, res: Response): Promise<voi
   // 2. Categories
   // 3. Budgets com category
   // 4. Spent by category/month (aggregation)
-  
+
   // Converter month para range de datas
   const [year, monthValue] = currentMonth.split('-').map(Number);
   const startDate = new Date(year, monthValue - 1, 1);
@@ -61,7 +58,7 @@ export const getDashboard = async (req: AuthRequest, res: Response): Promise<voi
     // Query 1: Soma de income e expense (filtrado por período)
     prisma.transaction.groupBy({
       by: ['type'],
-      where: { 
+      where: {
         userId,
         date: {
           gte: startDate,
@@ -84,7 +81,7 @@ export const getDashboard = async (req: AuthRequest, res: Response): Promise<voi
     }),
     // Query 3: Orçamentos com categoria (do mês filtrado + meses anteriores)
     prisma.budget.findMany({
-      where: { 
+      where: {
         userId,
         month: {
           lte: currentMonth,
@@ -140,7 +137,7 @@ export const getDashboard = async (req: AuthRequest, res: Response): Promise<voi
       const spentRecord = spentByCategoryMonth.find((s) => s.categoryId === budget.categoryId);
       const spent = spentRecord?._sum?.amount ?? 0;
       const ratio = budget.amount > 0 ? spent / budget.amount : 0;
-      const level: 'ok' | 'warning' | 'danger' = 
+      const level: 'ok' | 'warning' | 'danger' =
         ratio >= 1 ? 'danger' : ratio >= 0.8 ? 'warning' : 'ok';
 
       return {
@@ -167,10 +164,12 @@ export const getDashboard = async (req: AuthRequest, res: Response): Promise<voi
       income,
       expense,
       categories,
-      budgets: budgets.filter(b => b.month === currentMonth),
+      budgets: budgets.filter((b) => b.month === currentMonth),
       alerts,
       recentTransactions,
       currentMonthData,
     },
   });
 };
+
+

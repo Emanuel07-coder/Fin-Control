@@ -1,0 +1,144 @@
+import { describe, it, expect, vi } from 'vitest';
+import {
+  signAccessToken,
+  signRefreshToken,
+  verifyAccessToken,
+  verifyRefreshToken,
+  rotateRefreshToken,
+  revokeAllRefreshTokens,
+} from '../src/utils/jwt';
+import { AppError } from '../src/utils/AppError';
+import prisma from '../src/config/database';
+
+// Mock prisma
+vi.mock('../src/config/database', () => {
+  return {
+    default: {
+      refreshToken: {
+        findMany: vi.fn(),
+        create: vi.fn(),
+        findUnique: vi.fn(),
+        deleteMany: vi.fn(),
+      },
+    },
+  };
+});
+
+const mockPrisma = prisma as unknown as {
+  refreshToken: {
+    findMany: ReturnType<typeof vi.fn>;
+    create: ReturnType<typeof vi.fn>;
+    findUnique: ReturnType<typeof vi.fn>;
+    deleteMany: ReturnType<typeof vi.fn>;
+  },
+};
+
+describe('JWT Utils', () => {
+  const payload = { userId: 'user-123', id: 'user-123' };
+  const secret = 'test-secret';
+  const refreshSecret = 'test-refresh-secret';
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Mock the environment variables
+    process.env.JWT_SECRET = secret;
+    process.env.JWT_ACCESS_SECRET = secret;
+    process.env.JWT_REFRESH_SECRET = refreshSecret;
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  describe('signAccessToken', () => {
+    it('should return a signed JWT token', () => {
+      const token = signAccessToken(payload);
+      expect(typeof token).toBe('string');
+      expect(token.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('signRefreshToken', () => {
+    it('should return a signed JWT token', () => {
+      const token = signRefreshToken(payload);
+      expect(typeof token).toBe('string');
+      expect(token.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('verifyAccessToken', () => {
+    it('should return the payload for a valid token', () => {
+      const token = signAccessToken(payload);
+      const decoded = verifyAccessToken(token);
+      expect(decoded).toEqual(payload);
+    });
+
+    it('should throw AppError for an invalid token', () => {
+      expect(() => verifyAccessToken('invalid-token')).toThrow(AppError);
+    });
+  });
+
+  describe('verifyRefreshToken', () => {
+    it('should return the payload for a valid token', async () => {
+      const token = signRefreshToken(payload);
+      // Mock the stored token
+      vi.mocked(prisma.refreshToken.findUnique).mockResolvedValue({
+        token,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      } as any);
+
+      const decoded = await verifyRefreshToken(token);
+      expect(decoded).toEqual(payload);
+    });
+
+    it('should throw AppError for an invalid token', async () => {
+      vi.mocked(prisma.refreshToken.findUnique).mockResolvedValue(null);
+      await expect(verifyRefreshToken('invalid-token')).rejects.toThrow(AppError);
+    });
+
+    it('should throw AppError for an expired token', async () => {
+      vi.mocked(prisma.refreshToken.findUnique).mockResolvedValue({
+        token: 'some-token',
+        expiresAt: new Date(Date.now() - 1000), // expired
+      } as any);
+      await expect(verifyRefreshToken('some-token')).rejects.toThrow(AppError);
+    });
+  });
+
+  describe('rotateRefreshToken', () => {
+    it('should delete the old token and return a new token', async () => {
+      const oldToken = 'old-token';
+      vi.mocked(prisma.refreshToken.deleteMany).mockResolvedValue({ count: 1 });
+      vi.mocked(prisma.refreshToken.create).mockResolvedValue(undefined);
+
+      const newToken = await rotateRefreshToken(payload.userId, oldToken);
+
+      expect(typeof newToken).toBe('string');
+      expect(newToken.length).toBeGreaterThan(0);
+      expect(mockPrisma.refreshToken.deleteMany).toHaveBeenCalledWith({
+        token: oldToken,
+      });
+      expect(mockPrisma.refreshToken.create).toHaveBeenCalled();
+    });
+
+    it('should return a new token when no old token is provided', async () => {
+      vi.mocked(prisma.refreshToken.deleteMany).mockResolvedValue({ count: 0 });
+      vi.mocked(prisma.refreshToken.create).mockResolvedValue(undefined);
+
+      const newToken = await rotateRefreshToken(payload.userId, undefined);
+
+      expect(typeof newToken).toBe('string');
+      expect(newToken.length).toBeGreaterThan(0);
+      expect(mockPrisma.refreshToken.create).toHaveBeenCalled();
+    });
+  });
+
+  describe('revokeAllRefreshTokens', () => {
+    it('should delete all refresh tokens for the user', async () => {
+      await revokeAllRefreshTokens(payload.userId);
+      expect(mockPrisma.refreshToken.deleteMany).toHaveBeenCalledWith({
+        userId: payload.userId,
+      });
+    });
+  });
+});
