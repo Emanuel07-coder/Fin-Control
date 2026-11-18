@@ -1,15 +1,13 @@
-import { Request } from 'express';
-import { prisma, getPrismaWithUser } from '../config/database';
+import { prisma } from '../config/database';
 import { AppError } from '../utils/AppError';
-import { TransactionInput, TransactionUpdateInput, transactionSchema, transactionUpdateSchema } from '../utils/schemas';
+import {
+  TransactionInput,
+  TransactionUpdateInput,
+  transactionSchema,
+  transactionUpdateSchema,
+} from '../utils/schemas';
 import { ZodError, z } from 'zod';
-
-type AuthRequest = Request & {
-  user?: {
-    userId: string;
-  };
-};
-
+import { Prisma } from '@prisma/client';
 
 // ============================================
 // Schema para validação de query params (filtros)
@@ -24,29 +22,24 @@ const transactionFiltersSchema = z.object({
   endDate: z.string().optional(),
 });
 
-type TransactionFilters = z.infer<typeof transactionFiltersSchema>;
+export type TransactionFilters = z.infer<typeof transactionFiltersSchema>;
 
-export const getTransactionsService = async (req: AuthRequest, res: any) => {
-  const userId = req.user?.userId;
+export { transactionFiltersSchema };
+
+// ============================================
+// Services de Transação (camada de domínio, sem acoplamento HTTP)
+// ============================================
+
+export const getTransactionsService = async (
+  userId: string,
+  filters: TransactionFilters
+) => {
   if (!userId) throw new AppError('Usuário não autenticado', 401);
-
-  // Instância estendida com o contexto de RLS
-  const db = getPrismaWithUser(userId);
-
-  let filters: TransactionFilters;
-  try {
-    filters = transactionFiltersSchema.parse(req.query);
-  } catch (error) {
-    if (error instanceof ZodError) {
-      throw new AppError('Parâmetros de filtro inválidos', 400);
-    }
-    throw error;
-  }
 
   const { page, limit, categoryId, type, startDate, endDate } = filters;
   const skip = (page - 1) * limit;
 
-  const where: Record<string, unknown> = {};
+  const where: Prisma.TransactionWhereInput = { userId };
 
   if (categoryId) {
     where.categoryId = categoryId;
@@ -59,68 +52,47 @@ export const getTransactionsService = async (req: AuthRequest, res: any) => {
   if (startDate || endDate) {
     where.date = {};
     if (startDate) {
-      (where.date as Record<string, Date>).gte = new Date(startDate);
+      (where.date as Prisma.DateTimeFilter).gte = new Date(startDate);
     }
     if (endDate) {
-      (where.date as Record<string, Date>).lte = new Date(endDate);
+      (where.date as Prisma.DateTimeFilter).lte = new Date(endDate);
     }
   }
 
-  // Com o RLS ativo, não é obrigatório passar 'userId' na cláusula where
   const [transactions, total] = await Promise.all([
-    db.transaction.findMany({
+    prisma.transaction.findMany({
       where,
       include: { category: true },
       orderBy: { date: 'desc' },
       skip,
       take: limit,
     }),
-    db.transaction.count({ where }),
+    prisma.transaction.count({ where }),
   ]);
 
-  return { message: 'Transações carregadas', data: transactions, pagination: { page, limit, total } };
+  return { transactions, pagination: { page, limit, total } };
 };
 
-export const createTransactionService = async (req: AuthRequest, res: any) => {
-  const userId = req.user?.userId;
-  if (!userId) throw new AppError('Usuário não autenticado', 401);
+export const createTransactionService = async (
+  userId: string,
+  data: TransactionInput
+) => {
+  // Gerar recorrências em lote atômico (createMany) para garantir
+  // atomicidade ACID: a transação principal e todas as parcelas futuras
+  // ficam no mesmo bloco de transação, evitando transação principal órfã
+  // em caso de falha nas parcelas.
+  if (data.recurrence !== 'NONE') {
+    const baseDate = new Date(data.date);
+    const installments: Prisma.TransactionCreateManyInput[] = [];
 
-  const db = getPrismaWithUser(userId);
-
-  let validated: TransactionInput;
-  try {
-    validated = transactionSchema.parse(req.body);
-  } catch (error) {
-    if (error instanceof ZodError) {
-      throw new AppError('Erro de validação', 400);
-    }
-    throw error;
-  }
-
-  const transaction = await db.transaction.create({
-    data: {
-      userId,
-      categoryId: validated.categoryId,
-      type: validated.type,
-      amount: validated.amount,
-      description: validated.description,
-      date: new Date(validated.date),
-      recurrence: validated.recurrence,
-    },
-    include: { category: true },
-  });
-
-  // Gerar recorrências dentro da sessão com RLS ativo
-  if (validated.recurrence !== 'NONE') {
-    const baseDate = new Date(validated.date);
     for (let i = 1; i <= 12; i++) {
       const nextDate = new Date(baseDate.getTime());
-      switch (validated.recurrence) {
+      switch (data.recurrence) {
         case 'DAILY':
           nextDate.setDate(baseDate.getDate() + i);
           break;
         case 'WEEKLY':
-          nextDate.setDate(baseDate.getDate() + (i * 7));
+          nextDate.setDate(baseDate.getDate() + i * 7);
           break;
         case 'MONTHLY':
           nextDate.setMonth(baseDate.getMonth() + i);
@@ -128,96 +100,113 @@ export const createTransactionService = async (req: AuthRequest, res: any) => {
       }
       if (nextDate.getFullYear() > baseDate.getFullYear() + 1) break;
 
-      await db.transaction.create({
-        data: {
-          userId,
-          categoryId: validated.categoryId,
-          type: validated.type,
-          amount: validated.amount,
-          description: `[REC #${i}] ${validated.description || 'Recorrente'}`,
-          date: nextDate,
-          recurrence: 'NONE',
-        },
+      installments.push({
+        userId,
+        categoryId: data.categoryId,
+        type: data.type,
+        amount: data.amount,
+        description: `[REC #${i}] ${data.description || 'Recorrente'}`,
+        date: nextDate,
+        recurrence: 'NONE',
       });
     }
+
+    const result = await prisma.$transaction(async (tx) => {
+      const transaction = await tx.transaction.create({
+        data: {
+          userId,
+          categoryId: data.categoryId,
+          type: data.type,
+          amount: data.amount,
+          description: data.description,
+          date: new Date(data.date),
+          recurrence: data.recurrence,
+        },
+        include: { category: true },
+      });
+
+      if (installments.length > 0) {
+        await tx.transaction.createMany({
+          data: installments,
+        });
+      }
+
+      return { transaction, statusCode: 201 };
+    });
+
+    return result;
   }
 
-  return { message: 'Transação criada com sucesso', data: transaction, statusCode: 201 };
-};
-
-export const updateTransactionService = async (req: AuthRequest, res: any) => {
-  const userId = req.user?.userId;
-  if (!userId) throw new AppError('Usuário não autenticado', 401);
-
-  const transactionId = String(req.params.id);
-  const db = getPrismaWithUser(userId);
-
-  let validated: TransactionUpdateInput;
-  try {
-    validated = transactionUpdateSchema.parse(req.body);
-  } catch (error) {
-    if (error instanceof ZodError) {
-      throw new AppError('Erro de validação', 400);
-    }
-    throw error;
-  }
-
-  const existing = await db.transaction.findUnique({
-    where: { id: transactionId },
-  });
-
-  if (!existing) {
-    throw new AppError('Transação não encontrada', 404);
-  }
-
-  // Defesa em profundidade: verificação explícita de propriedade além do RLS
-  if (existing.userId !== userId) {
-    throw new AppError('Você não tem permissão para alterar esta transação', 403);
-  }
-
-  if (validated.categoryId) {
-    // Categoria validada pelo Prisma foreign key constraint no banco
-  }
-
-  const updated = await db.transaction.update({
-    where: { id: transactionId },
+  const transaction = await prisma.transaction.create({
     data: {
-      categoryId: validated.categoryId,
-      type: validated.type,
-      amount: validated.amount,
-      description: validated.description,
-      date: validated.date ? new Date(validated.date) : undefined,
-      recurrence: validated.recurrence,
+      userId,
+      categoryId: data.categoryId,
+      type: data.type,
+      amount: data.amount,
+      description: data.description,
+      date: new Date(data.date),
+      recurrence: data.recurrence,
     },
     include: { category: true },
   });
 
-  return { message: 'Transação atualizada com sucesso', data: updated };
+  return { transaction, statusCode: 201 };
 };
 
-export const deleteTransactionService = async (req: AuthRequest, res: any) => {
-  const userId = req.user?.userId;
-  if (!userId) throw new AppError('Usuário não autenticado', 401);
-
-  const transactionId = String(req.params.id);
-  const db = getPrismaWithUser(userId);
-
-  const existing = await db.transaction.findUnique({
-    where: { id: transactionId },
+export const updateTransactionService = async (
+  userId: string,
+  transactionId: string,
+  data: TransactionUpdateInput
+) => {
+  const existing = await prisma.transaction.findUnique({
+    where: { id: transactionId, userId },
   });
 
   if (!existing) {
     throw new AppError('Transação não encontrada', 404);
   }
 
-  // Defesa em profundidade: verificação explícita de propriedade além do RLS
+  // Defesa em profundidade: verificação explícita de propriedade
+  if (existing.userId !== userId) {
+    throw new AppError('Você não tem permissão para alterar esta transação', 403);
+  }
+
+  const updated = await prisma.transaction.update({
+    where: { id: transactionId, userId },
+    data: {
+      categoryId: data.categoryId,
+      type: data.type,
+      amount: data.amount,
+      description: data.description,
+      date: data.date ? new Date(data.date) : undefined,
+      recurrence: data.recurrence,
+    },
+    include: { category: true },
+  });
+
+  return { transaction: updated };
+};
+
+export const deleteTransactionService = async (
+  userId: string,
+  transactionId: string
+) => {
+  const existing = await prisma.transaction.findUnique({
+    where: { id: transactionId, userId },
+  });
+
+  if (!existing) {
+    throw new AppError('Transação não encontrada', 404);
+  }
+
+  // Defesa em profundidade: verificação explícita de propriedade
   if (existing.userId !== userId) {
     throw new AppError('Você não tem permissão para excluir esta transação', 403);
   }
 
-  await db.transaction.delete({
-    where: { id: transactionId },
+  await prisma.transaction.delete({
+    where: { id: transactionId, userId },
   });
 
-  return { message: 'Transação excluída com sucesso' };
+  return { id: transactionId };
 };
