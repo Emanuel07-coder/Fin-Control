@@ -58,6 +58,7 @@ export const authenticateToken = async (req: AuthRequest, res: Response, next: N
     if (!user) throw new AppError('Usuário não encontrado ou conta desativada', 404);
 
     req.user = { userId: user.id };
+
     next();
   } catch (error) {
     next(error);
