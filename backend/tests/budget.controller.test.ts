@@ -223,7 +223,7 @@ describe('Budget Controller', () => {
       await updateBudget(req, mockRes);
 
       expect(mockPrisma.budget.update).toHaveBeenCalledWith({
-        where: { id: 'budget-1' },
+        where: { id: 'budget-1', userId: 'user-123' },
         data: { amount: 350 },
       });
       expect(mockRes.json).toHaveBeenCalledWith({
@@ -261,7 +261,7 @@ describe('Budget Controller', () => {
       await deleteBudget(req, mockRes);
 
       expect(mockPrisma.budget.delete).toHaveBeenCalledWith({
-        where: { id: 'budget-1' },
+        where: { id: 'budget-1', userId: 'user-123' },
       });
       expect(mockRes.json).toHaveBeenCalledWith({
         message: 'Orçamento excluído com sucesso',
