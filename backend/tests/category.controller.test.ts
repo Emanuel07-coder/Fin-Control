@@ -47,7 +47,7 @@ describe('Category Controller', () => {
 
   afterAll(async () => {
     try {
-      await prisma.$executeRawUnsafe(`SET app.current_user_id = '${userId}';`);
+      await prisma.$executeRawUnsafe('SET app.current_user_id = $1', userId);
       await prisma.category.deleteMany({ where: { userId } });
       await prisma.user.delete({ where: { id: userId } });
     } catch {

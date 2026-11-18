@@ -3,23 +3,25 @@ import api from '../services/api';
 import { DashboardData, getCurrentMonth } from '../types';
 
 interface DashboardParams {
-  month?: string;
+  startDate?: string;
+  endDate?: string;
 }
 
 interface UseDashboardOptions extends Omit<UseQueryOptions<DashboardData>, 'queryKey' | 'queryFn'> {}
 
-// TD-11: Hook atualizado com suporte a filtro de mês
+// TD-11: Hook atualizado com suporte a filtro de período (startDate/endDate)
 export const useDashboard = (
-  params: DashboardParams = {},
-  options?: UseQueryOptions<DashboardData>
+  startDate?: string,
+  endDate?: string,
+  options?: UseDashboardOptions,
 ) => {
-  const { month = getCurrentMonth() } = params;
+  const currentMonth = getCurrentMonth();
 
   return useQuery<DashboardData>({
-    queryKey: ['dashboard', month],
+    queryKey: ['dashboard', startDate, endDate, currentMonth],
     queryFn: async () => {
       const response = await api.get('/dashboard', {
-        params: { month },
+        params: { startDate, endDate },
       });
       return response.data.data;
     },

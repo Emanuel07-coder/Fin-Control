@@ -124,6 +124,39 @@ describe('Auth Controller', () => {
       expect(response.body.data).toHaveProperty('accessToken');
       expect(response.body.data).toHaveProperty('refreshToken');
     });
+
+    it('deve recusar reuso de refresh token já rotacionado (rotacao real)', async () => {
+      const session = await createUniqueTestUser('refresh-rotation-test');
+      const refreshToken = session.refreshToken;
+
+      // Primeira rotacao: valida e emite novo par de tokens
+      const firstRotate = await request(app)
+        .post(`${BASE_URL}/auth/refresh`)
+        .send({ refreshToken })
+        .expect(200);
+
+      const newRefreshToken = firstRotate.body.data.tokens.refreshToken;
+      expect(newRefreshToken).toBeDefined();
+      expect(newRefreshToken).not.toBe(refreshToken);
+
+      // Tentativa de reuso do token antigo (ja rotacionado): deve falhar com 401
+      await request(app)
+        .post(`${BASE_URL}/auth/refresh`)
+        .send({ refreshToken })
+        .expect(401);
+
+      // O token antigo deve estar revogado: nao deve conseguir renovar com ele
+      await request(app)
+        .post(`${BASE_URL}/auth/refresh`)
+        .send({ refreshToken })
+        .expect(401);
+
+      // O novo token deve continuar funcionando
+      await request(app)
+        .post(`${BASE_URL}/auth/refresh`)
+        .send({ refreshToken: newRefreshToken })
+        .expect(200);
+    });
   });
 
   describe('GET /auth/profile', () => {
