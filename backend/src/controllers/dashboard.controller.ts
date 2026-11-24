@@ -1,11 +1,10 @@
-import { Request, Response } from 'express';
+import { Response } from 'express';
+import { AuthRequest } from '../types/express';
 import prisma from '../config/database';
 import { AppError } from '../utils/AppError';
+import { asyncHandler } from '../utils/asyncHandler';
 import { z } from 'zod';
-
-interface AuthRequest extends Request {
-  user?: { userId: string };
-}
+import { getChartsData } from '../services/dashboard.service';
 
 interface BudgetAlert {
   budgetId: string;
@@ -22,125 +21,171 @@ interface BudgetAlert {
 
 const dashboardQuerySchema = z.object({
   month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/).optional(),
+  startDate: z.string().optional(),
+  endDate: z.string().optional(),
 });
 
 type DashboardQuery = z.infer<typeof dashboardQuerySchema>;
+
+/**
+ * Converte uma string de data (YYYY-MM-DD) para um Date no início do dia em UTC.
+ * Evita bugs de fuso horário no PostgreSQL.
+ */
+function startOfDayUtc(dateStr: string): Date {
+  return new Date(`${dateStr}T00:00:00.000Z`);
+}
+
+/**
+ * Converte uma string de data (YYYY-MM-DD) para um Date no final do dia em UTC.
+ * Evita bugs de fuso horário no PostgreSQL.
+ */
+function endOfDayUtc(dateStr: string): Date {
+  return new Date(`${dateStr}T23:59:59.999Z`);
+}
+
+/**
+ * Retorna o primeiro dia do mês atual como string YYYY-MM-DD.
+ */
+function currentMonthStart(): string {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
+}
+
+/**
+ * Retorna o último dia do mês atual como string YYYY-MM-DD.
+ */
+function currentMonthEnd(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
+  const lastDay = new Date(year, month, 0).getDate();
+  return `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+}
+
+// ============================================
+// Dashboard - dados dos cartões de saldo
+// ============================================
 
 export const getDashboard = async (req: AuthRequest, res: Response): Promise<void> => {
   const userId = req.user?.userId;
   if (!userId) throw new AppError('Usuário não autenticado', 401);
 
-  // TD-11: Validar query params com Zod
-  let queryParams: DashboardQuery;
-  try {
-    queryParams = dashboardQuerySchema.parse(req.query);
-  } catch {
-    // Se o mês for inválido, ignora e usa o atual
-    queryParams = {};
-  }
+  // Extrair datas dos query params, com fallback para o mês atual
+  const rawStartDate = req.query.startDate as string | undefined;
+  const rawEndDate = req.query.endDate as string | undefined;
 
-  // Mês atual se não especificado
-  const currentMonth = queryParams.month || (() => {
-    const now = new Date();
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-  })();
+  const startDateStr = rawStartDate || currentMonthStart();
+  const endDateStr = rawEndDate || currentMonthEnd();
 
-  // TD-05: OTIMIZAÇÃO - Query única para dados do dashboard
-  // Em vez de N+1 queries, fazemos 3 queries paralelas:
-  // 1. Transactions aggregated por tipo (filtrado por mês se especificado)
-  // 2. Categories
-  // 3. Budgets com category
-  // 4. Spent by category/month (aggregation)
-  
-  // Converter month para range de datas
-  const [year, monthValue] = currentMonth.split('-').map(Number);
-  const startDate = new Date(year, monthValue - 1, 1);
-  const endDate = new Date(year, monthValue, 1);
+  // Forçar UTC para evitar problemas de fuso horário no PostgreSQL
+  const start = startOfDayUtc(startDateStr);
+  const end = endOfDayUtc(endDateStr);
 
-  const [transactionsAgg, categories, budgets, spentByCategoryMonth, recentTransactions] = await Promise.all([
-    // Query 1: Soma de income e expense (filtrado por período)
-    prisma.transaction.groupBy({
-      by: ['type'],
-      where: { 
-        userId,
-        date: {
-          gte: startDate,
-          lt: endDate,
+  // Determinar currentMonth para uso em orçamentos/categorias.
+  // Derivado da string da data (não do Date convertido) para evitar
+  // deslocamento de fuso horário (ex: UTC-04 leria outubro em vez de novembro).
+  const currentMonth = startDateStr.slice(0, 7); // YYYY-MM
+
+  // ============================================
+  // Consultas independentes executadas em paralelo
+  // ============================================
+
+  const [aggregatedByType, recentTransactions, categories, budgets] =
+    await Promise.all([
+      // 1) Agregação de transações por tipo e categoria (centavos inteiros),
+      //    substituindo busca de todas + laço de soma em memória.
+      prisma.transaction.groupBy({
+        by: ['type', 'categoryId'],
+        where: {
+          userId: req.user!.userId,
+          date: {
+            gte: start,
+            lte: end,
+          },
         },
-      },
-      _sum: {
-        amount: true,
-      },
-    }),
-    // Query 2: Categorias do usuário + default
-    prisma.category.findMany({
-      where: {
-        OR: [
-          { userId },
-          { isDefault: true },
-        ],
-      },
-      orderBy: { name: 'asc' },
-    }),
-    // Query 3: Orçamentos com categoria (do mês filtrado + meses anteriores)
-    prisma.budget.findMany({
-      where: { 
-        userId,
-        month: {
-          lte: currentMonth,
+        _sum: {
+          amount: true,
         },
-      },
-      include: { category: true },
-      orderBy: { month: 'desc' },
-      take: 12,
-    }),
-    // Query 4: Gastos por categoria no mês filtrado
-    prisma.transaction.groupBy({
-      by: ['categoryId'],
-      where: {
-        userId,
-        type: 'EXPENSE',
-        date: {
-          gte: startDate,
-          lt: endDate,
-        },
-      },
-      _sum: {
-        amount: true,
-      },
-    }),
-    // Query 5: Transações recentes (últimas 5)
-    prisma.transaction.findMany({
-      where: { userId },
-      include: { category: true },
-      orderBy: { date: 'desc' },
-      take: 5,
-    }),
-  ]);
+      }),
 
-  // Calcular income e expense dos resultados agregados
+      // 2) Transações recentes (últimas 5) do período
+      prisma.transaction.findMany({
+        where: {
+          userId: req.user!.userId,
+          date: {
+            gte: start,
+            lte: end,
+          },
+        },
+        include: { category: true },
+        orderBy: { date: 'desc' },
+        take: 5,
+      }),
+
+      // 3) Categorias do usuário + default (filtro explícito por userId)
+      prisma.category.findMany({
+        where: {
+          OR: [
+            { userId },
+            { isDefault: true },
+          ],
+        },
+        orderBy: { name: 'asc' },
+      }),
+
+      // 4) Orçamentos com categoria (filtro explícito por userId)
+      prisma.budget.findMany({
+        where: {
+          userId,
+          month: {
+            lte: currentMonth,
+          },
+        },
+        include: { category: true },
+        orderBy: { month: 'desc' },
+        take: 12,
+      }),
+    ]);
+
+  // ============================================
+  // Cálculos em memória a partir dos dados agregados (centavos inteiros)
+  // ============================================
+
   let income = 0;
   let expense = 0;
+  const spentByCategoryMap = new Map<string, number>();
 
-  for (const agg of transactionsAgg) {
+  for (const agg of aggregatedByType) {
     const amount = agg._sum.amount ?? 0;
     if (agg.type === 'INCOME') {
       income += amount;
     } else if (agg.type === 'EXPENSE') {
       expense += amount;
+      const current = spentByCategoryMap.get(agg.categoryId) ?? 0;
+      spentByCategoryMap.set(agg.categoryId, current + amount);
     }
   }
 
   const balance = income - expense;
 
+  // Converter spentByCategoryMap para array compatível com a lógica existente
+  const spentByCategoryMonth = Array.from(spentByCategoryMap.entries()).map(
+    ([categoryId, amount]) => ({
+      categoryId,
+      _sum: { amount },
+    }),
+  );
+
   // Calcular alertas de orçamento em memória
   const alerts: BudgetAlert[] = budgets
     .filter((budget) => budget.month === currentMonth)
     .map((budget) => {
-      const spentRecord = spentByCategoryMonth.find((s) => s.categoryId === budget.categoryId);
+      const spentRecord = spentByCategoryMonth.find(
+        (s) => s.categoryId === budget.categoryId,
+      );
       const spent = spentRecord?._sum?.amount ?? 0;
       const ratio = budget.amount > 0 ? spent / budget.amount : 0;
-      const level: 'ok' | 'warning' | 'danger' = 
+      const level: 'ok' | 'warning' | 'danger' =
         ratio >= 1 ? 'danger' : ratio >= 0.8 ? 'warning' : 'ok';
 
       return {
@@ -156,8 +201,8 @@ export const getDashboard = async (req: AuthRequest, res: Response): Promise<voi
   // Incluir informações do mês filtrado
   const currentMonthData = {
     month: currentMonth,
-    startDate: startDate.toISOString(),
-    endDate: endDate.toISOString(),
+    startDate: start.toISOString(),
+    endDate: end.toISOString(),
   };
 
   res.json({
@@ -167,10 +212,37 @@ export const getDashboard = async (req: AuthRequest, res: Response): Promise<voi
       income,
       expense,
       categories,
-      budgets: budgets.filter(b => b.month === currentMonth),
+      budgets: budgets.filter((b) => b.month === currentMonth),
       alerts,
       recentTransactions,
       currentMonthData,
     },
   });
 };
+
+// ============================================
+// Gráficos para o frontend (Recharts)
+// ============================================
+export const getDashboardCharts = asyncHandler(
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const userId = req.user?.userId;
+    if (!userId) throw new AppError('Usuário não autenticado', 401);
+
+    const { startDate, endDate } = req.query;
+
+    // Fallback para mês atual se datas não fornecidas
+    const startDateStr = (startDate as string) || currentMonthStart();
+    const endDateStr = (endDate as string) || currentMonthEnd();
+
+    // Forçar UTC para evitar problemas de fuso horário no PostgreSQL
+    const start = startOfDayUtc(startDateStr);
+    const end = endOfDayUtc(endDateStr);
+
+    const data = await getChartsData(prisma, req.user!.userId, start, end);
+
+    res.status(200).json({
+      message: 'Dados dos gráficos carregados',
+      data,
+    });
+  },
+);

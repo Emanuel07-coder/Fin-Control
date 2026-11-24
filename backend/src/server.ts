@@ -1,6 +1,10 @@
 import 'dotenv/config';
+import { validateEnv } from './config/env';
 import app from './utils/app';
 import prisma from './config/database';
+
+// Valida variáveis obrigatórias antes de conectar ao banco / iniciar o servidor
+validateEnv();
 
 const PORT = Number(process.env.PORT) || 3001;
 

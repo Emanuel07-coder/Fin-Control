@@ -27,7 +27,15 @@ const Login: React.FC = () => {
   });
 
   const onSubmit = async (data: LoginInput) => {
-    await login(data.email, data.password);
+    try {
+      await login(data.email, data.password);
+    } catch {
+      // Erro já é capturado no AuthContext e exibido via `error`
+      // O bloco finally do AuthContext já reseta isLoading para false
+    } finally {
+      // Garantia adicional: isLoading é gerenciado pelo AuthContext,
+      // mas este finally serve como rede de segurança para o botão.
+    }
   };
 
   const containerVariants = {

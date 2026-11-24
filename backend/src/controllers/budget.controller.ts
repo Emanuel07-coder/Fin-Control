@@ -1,12 +1,9 @@
 import { Request, Response } from 'express';
+import { AuthRequest } from '../types/express';
 import prisma from '../config/database';
 import { AppError } from '../utils/AppError';
 import { BudgetInput, BudgetUpdateInput, budgetSchema as budgetInputSchema, budgetUpdateSchema } from '../utils/schemas';
 import { ZodError } from 'zod';
-
-interface AuthRequest extends Request {
-  user?: { userId: string };
-}
 
 export const getBudgets = async (req: AuthRequest, res: Response): Promise<void> => {
   const userId = req.user?.userId;
@@ -111,7 +108,7 @@ export const updateBudget = async (req: AuthRequest, res: Response): Promise<voi
   }
 
   const existing = await prisma.budget.findUnique({
-    where: { id: budgetId },
+    where: { id: budgetId, userId },
   });
 
   if (!existing || existing.userId !== userId) {
@@ -119,7 +116,7 @@ export const updateBudget = async (req: AuthRequest, res: Response): Promise<voi
   }
 
   const updated = await prisma.budget.update({
-    where: { id: budgetId },
+    where: { id: budgetId, userId },
     data: validated,
   });
 
@@ -135,7 +132,7 @@ export const deleteBudget = async (req: AuthRequest, res: Response): Promise<voi
 
   const budgetId = String(req.params.id);
   const existing = await prisma.budget.findUnique({
-    where: { id: budgetId },
+    where: { id: budgetId, userId },
   });
 
   if (!existing || existing.userId !== userId) {
@@ -143,7 +140,7 @@ export const deleteBudget = async (req: AuthRequest, res: Response): Promise<voi
   }
 
   await prisma.budget.delete({
-    where: { id: budgetId },
+    where: { id: budgetId, userId },
   });
 
   res.json({

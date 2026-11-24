@@ -13,6 +13,7 @@ const registerSchema = z.object({
   name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
   email: z.string().email('Email inválido'),
   password: z.string().min(8, 'Senha deve ter pelo menos 8 caracteres'),
+  terms: z.boolean().refine((val) => val === true, 'Você deve aceitar os Termos de Uso e Política de Privacidade'),
 });
 
 type RegisterInput = z.infer<typeof registerSchema>;
@@ -40,11 +41,7 @@ const Register: React.FC = () => {
 
   const itemVariants = {
     hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.5 },
-    },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.5 } },
   };
 
   return (
@@ -81,10 +78,7 @@ const Register: React.FC = () => {
         </motion.div>
 
         {/* Form Card */}
-        <motion.div
-          variants={itemVariants}
-          className="panel-premium"
-        >
+        <motion.div variants={itemVariants} className="panel-premium">
           {error && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
@@ -162,6 +156,26 @@ const Register: React.FC = () => {
               </div>
               {errors.password && (
                 <p className="mt-1.5 text-xs text-burgundy-text">{errors.password.message}</p>
+              )}
+            </motion.div>
+
+            {/* Checkbox de Consentimento LGPD */}
+            <motion.div variants={itemVariants}>
+              <div className="flex items-start gap-3">
+                <input
+                  id="terms"
+                  type="checkbox"
+                  className="w-4 h-4 mt-1 rounded border-charcoal-lighter text-gold-accent focus:ring-gold-accent"
+                  {...register('terms')}
+                />
+                <label htmlFor="terms" className="text-sm text-paper-dark/70 leading-relaxed cursor-pointer">
+                  Li e concordo com os{' '}
+                  <Link to="/terms" className="text-gold-accent hover:underline">Termos de Uso</Link> e{' '}
+                  <Link to="/privacy" className="text-gold-accent hover:underline">Política de Privacidade</Link>
+                </label>
+              </div>
+              {errors.terms && (
+                <p className="mt-1.5 text-xs text-burgundy-text">{errors.terms.message}</p>
               )}
             </motion.div>
 

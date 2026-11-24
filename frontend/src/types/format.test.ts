@@ -50,6 +50,7 @@ describe('parseToCentavos', () => {
     expect(parseToCentavos('100.50')).toBe(10050);
     expect(parseToCentavos('1.000,00')).toBe(100000);
     expect(parseToCentavos('0,99')).toBe(99);
+    expect(parseToCentavos('1,000.50')).toBe(100050);
   });
 
   it('deve lidar com entradas inválidas', () => {

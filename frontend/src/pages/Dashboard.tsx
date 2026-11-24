@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useDashboard } from '../hooks/useDashboard';
 import { Button } from '../components/ui/button';
@@ -8,7 +8,9 @@ import { formatCurrency, formatDate } from '../types';
 import { StatsCardSkeleton } from '../components/ui/skeleton';
 import { CategoryIcon } from './Categories';
 import { BudgetAlertBadge } from '../components/ui/alert';
+import { DashboardCharts } from '../components/dashboard/DashboardCharts';
 import { Link } from 'react-router-dom';
+import { startOfMonth, endOfMonth, format } from 'date-fns';
 
 // Stats Card with Bento Grid styling
 interface StatsCardProps {
@@ -108,8 +110,14 @@ const EmptyState: React.FC = () => (
 // Dashboard Component
 const Dashboard: React.FC = () => {
   const { user, logout } = useAuth();
-  const { data: dashboard, isLoading, error } = useDashboard();
   const currency = user?.currency || 'BRL';
+
+  // Estado dos filtros de data (Lifting State Up - elevado para a página)
+  const now = new Date();
+  const [startDate, setStartDate] = useState(() => format(startOfMonth(now), 'yyyy-MM-dd'));
+  const [endDate, setEndDate] = useState(() => format(endOfMonth(now), 'yyyy-MM-dd'));
+
+  const { data: dashboard, isLoading, error } = useDashboard(startDate, endDate);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -124,8 +132,8 @@ const Dashboard: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-rich-black p-4 sm:p-6 md:p-8">
-        <div className="max-w-6xl mx-auto mb-8">
+      <div className="flex-1 w-full overflow-y-auto p-4 sm:p-6 md:p-8">
+        <div className="w-full mb-8">
           <div className="flex items-center justify-between mb-6">
             <div>
               <h1 className="text-3xl md:text-4xl font-display font-bold text-paper-dark mb-1">
@@ -137,8 +145,8 @@ const Dashboard: React.FC = () => {
           <div className="h-px bg-gradient-to-r from-gold-accent/20 via-gold-accent/5 to-transparent" />
         </div>
 
-        <div className="max-w-6xl mx-auto space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="w-full space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             <StatsCardSkeleton />
             <StatsCardSkeleton />
             <StatsCardSkeleton />
@@ -150,15 +158,15 @@ const Dashboard: React.FC = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-rich-black p-4 sm:p-6 md:p-8">
-        <div className="max-w-6xl mx-auto mb-8">
+      <div className="flex-1 w-full overflow-y-auto p-4 sm:p-6 md:p-8">
+        <div className="w-full mb-8">
           <h1 className="text-3xl md:text-4xl font-display font-bold text-paper-dark mb-1">
             Dashboard
           </h1>
           <div className="h-px bg-gradient-to-r from-gold-accent/20 via-gold-accent/5 to-transparent mt-4" />
         </div>
 
-        <div className="max-w-6xl mx-auto">
+        <div className="w-full">
           <ErrorState message={error.message || 'Erro ao carregar dashboard'} />
         </div>
       </div>
@@ -169,12 +177,12 @@ const Dashboard: React.FC = () => {
   const alerts = dashboard?.alerts || [];
 
   return (
-    <div className="min-h-screen bg-rich-black p-4 sm:p-6 md:p-8">
+    <div className="flex-1 w-full overflow-y-auto p-4 sm:p-6 md:p-8">
       {/* Top Header & Actions */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="max-w-6xl mx-auto mb-8"
+        className="w-full mb-8"
       >
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
           <div>
@@ -193,7 +201,7 @@ const Dashboard: React.FC = () => {
                 <span>Nova Transação</span>
               </Button>
             </Link>
-            
+
             <Link to="/categories">
               <Button size="sm" variant="secondary" className="gap-2">
                 <FolderPlus className="w-4 h-4" />
@@ -213,13 +221,13 @@ const Dashboard: React.FC = () => {
       </motion.div>
 
       {/* Main Content Container */}
-      <div className="max-w-6xl mx-auto space-y-8">
+      <div className="w-full space-y-8">
         {/* Stats Grid */}
         <motion.div
           variants={containerVariants}
           initial="hidden"
           animate="visible"
-          className="grid grid-cols-1 md:grid-cols-3 gap-6"
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
         >
           <StatsCard
             title="Saldo"
@@ -265,7 +273,7 @@ const Dashboard: React.FC = () => {
                 Gerenciar Orçamentos <ArrowRight className="w-3 h-3" />
               </Link>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {alerts.map((alert) => {
                 const category = dashboard?.categories?.find(c => c.id === alert.categoryId);
@@ -275,7 +283,7 @@ const Dashboard: React.FC = () => {
                     className="flex items-center justify-between p-3.5 rounded-xl bg-charcoal-light/30 border border-charcoal-lighter"
                   >
                     <div className="flex items-center gap-3">
-                      <div 
+                      <div
                         className="p-2 rounded-full flex items-center justify-center"
                         style={{ backgroundColor: `${category?.color || '#D4AF37'}25` }}
                       >
@@ -298,74 +306,13 @@ const Dashboard: React.FC = () => {
           </motion.div>
         )}
 
-        {/* Recent Transactions Section */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="card-premium p-6 rounded-xl border border-charcoal-lighter bg-near-black/50"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-xl md:text-2xl font-display font-bold text-paper-dark mb-1">
-                Transações Recentes
-              </h2>
-              <p className="text-paper-dark/60 text-xs sm:text-sm">
-                Suas atividades financeiras mais recentes
-              </p>
-            </div>
-            <Link to="/transactions">
-              <Button variant="secondary" size="sm" className="gap-2 text-xs">
-                Ver Todas <ArrowRight className="w-3.5 h-3.5" />
-              </Button>
-            </Link>
-          </div>
-
-          <div className="h-px bg-gold-accent/10 mb-4" />
-          
-          {recentTransactions.length > 0 ? (
-            <div className="divide-y divide-charcoal-lighter/60">
-              {recentTransactions.map((tx) => {
-                const category = tx.category || dashboard?.categories?.find(c => c.id === tx.categoryId);
-                return (
-                  <div
-                    key={tx.id}
-                    className="flex items-center justify-between py-3 px-3 hover:bg-charcoal-light/30 rounded-lg transition-colors"
-                  >
-                    <div className="flex items-center gap-3.5">
-                      <div 
-                        className="p-2.5 rounded-full flex items-center justify-center shrink-0"
-                        style={{ backgroundColor: `${category?.color || (tx.type === 'INCOME' ? '#22C55E' : '#EF4444')}20` }}
-                      >
-                        <CategoryIcon 
-                          name={category?.icon} 
-                          className="w-4 h-4" 
-                          style={{ color: category?.color || (tx.type === 'INCOME' ? '#22C55E' : '#EF4444') }} 
-                        />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-paper-dark font-medium text-sm truncate">
-                          {tx.description || category?.name || 'Transação'}
-                        </p>
-                        <p className="text-xs text-paper-dark/60">
-                          {category?.name || 'Sem categoria'} • {formatDate(tx.date)}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <span className={`text-sm font-display font-bold shrink-0 ml-4 ${
-                      tx.type === 'INCOME' ? 'text-emerald-text' : 'text-burgundy-text'
-                    }`}>
-                      {tx.type === 'INCOME' ? '+' : '-'}{formatCurrency(tx.amount, currency)}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <EmptyState />
-          )}
-        </motion.div>
+        {/* Dashboard Charts Section */}
+        <DashboardCharts
+          startDate={startDate}
+          endDate={endDate}
+          setStartDate={setStartDate}
+          setEndDate={setEndDate}
+        />
       </div>
     </div>
   );

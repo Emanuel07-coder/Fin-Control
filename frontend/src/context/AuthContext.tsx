@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, ReactNode, useCallback, use
 import api, { getRefreshToken, setTokens, getAccessToken, setCsrfToken } from '../services/api';
 import { useNavigate } from 'react-router-dom';
 import { AxiosError } from 'axios';
+import { useThemeStore } from '../store/themeStore';
 
 interface User {
   id: string;
@@ -20,15 +21,17 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<void>;
   register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => void;
+  deleteAccount: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true); 
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
+  const setCurrency = useThemeStore((state) => state.setCurrency);
 
   const isAuthenticated = !!user;
 
@@ -37,8 +40,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       try {
         const token = getAccessToken();
         if (token) {
-          const response = await api.get('/user/me'); 
+          const response = await api.get('/auth/profile');
           setUser(response.data.data);
+          setCurrency(response.data.data.currency);
         }
       } catch (err) {
         if (err instanceof AxiosError && err.response?.status === 401) {
@@ -74,7 +78,8 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setTokens(accessToken, refreshToken);
       setCsrfToken(csrfToken || null);
       setUser(user);
-      
+      setCurrency(user.currency);
+
       navigate('/dashboard');
     } catch (err) {
       const message = err instanceof AxiosError
@@ -105,6 +110,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setTokens(accessToken, refreshToken);
       setCsrfToken(csrfToken || null);
       setUser(user);
+      setCurrency(user.currency);
       navigate('/dashboard');
     } catch (err) {
       const message = err instanceof AxiosError
@@ -131,7 +137,21 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     }
   }, [navigate]);
 
-  const value = { user, isAuthenticated, isLoading, error, login, register, logout };
+  const deleteAccount = useCallback(async () => {
+    try {
+      await api.delete('/auth/me');
+    } catch {
+      // Silenciando erro de exclusão de conta
+    } finally {
+      setTokens(null, null);
+      setCsrfToken(null);
+      setUser(null);
+      setError(null);
+      navigate('/login');
+    }
+  }, [navigate]);
+
+  const value = { user, isAuthenticated, isLoading, error, login, register, logout, deleteAccount };
 
   if (isLoading && !user) {
     return (

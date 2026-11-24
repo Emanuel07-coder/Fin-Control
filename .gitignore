@@ -10,7 +10,7 @@ node_modules/
 .env.production.local
 env.txt
 
-# Build e Cache
+# Build e Cache 
 dist/
 build/
 .vite/

@@ -4,6 +4,7 @@ import helmet from "helmet";
 import rateLimit from 'express-rate-limit';
 import routes from "../routes";
 import { errorHandler } from "../middleware/error";
+import { swaggerDocs } from "./swagger";
 
 const app = express();
 
@@ -84,6 +85,7 @@ const apiLimiter = rateLimit({
   max: 120,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === 'test', // 👈 Adicione esta linha
   handler: (req, res) => {
     res.status(429).json({
       error: 'Muitas requisições. Tente novamente em alguns instantes.',
@@ -96,6 +98,7 @@ const exportLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: () => process.env.NODE_ENV === 'test', // 👈 Adicione esta linha também
   handler: (req, res) => {
     res.status(429).json({
       error: 'Muitas exportações. Aguarde 1 minuto antes de solicitar outro relatório.',
@@ -126,5 +129,11 @@ app.get('/api/health', (req, res) => {
 
 // Error handler
 app.use(errorHandler);
+
+// Swagger docs
+if (process.env.NODE_ENV !== 'test') {
+  const port = Number(process.env.PORT) || 3001;
+  swaggerDocs(app, port);
+}
 
 export default app;

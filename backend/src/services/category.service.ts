@@ -1,43 +1,41 @@
-import { Request } from 'express';
-import { prisma, getPrismaWithUser } from '../config/database';
+import { prisma } from '../config/database';
 import { AppError } from '../utils/AppError';
 
-export interface AuthRequest extends Request {
-  user?: { userId: string };
-}
+// ============================================
+// Services de Categoria (camada de domínio, sem acoplamento HTTP)
+// ============================================
 
-export const getCategoriesService = async (req: AuthRequest, res: any) => {
-  const userId = req.user?.userId;
+export const getCategoriesService = async (userId: string) => {
   if (!userId) {
     throw new AppError('Usuário não autenticado', 401);
   }
 
-  // Instância do Prisma com o contexto de RLS do usuário
-  const db = getPrismaWithUser(userId);
-
-  // O RLS no PostgreSQL filtrará automaticamente as categorias globais + do usuário
-  const categories = await db.category.findMany({
+  // Filtro explícito por userId (isolamento a nível de aplicação)
+  const categories = await prisma.category.findMany({
+    where: {
+      userId,
+    },
     orderBy: { name: 'asc' },
   });
 
-  return { message: 'Categorias carregadas', data: categories };
+  return { categories };
 };
 
-export const createCategoryService = async (req: AuthRequest, res: any) => {
-  const userId = req.user?.userId;
+export const createCategoryService = async (
+  userId: string,
+  data: { name: string; color?: string; icon?: string }
+) => {
   if (!userId) {
-    throw new AppError('Usuário não autenticado', 401);
+    throw new AppError('Usuário não autenticado', 400);
   }
 
-  const { name, color, icon } = req.body;
+  const { name, color, icon } = data;
 
   if (!name) {
     throw new AppError('Nome da categoria é obrigatório', 400);
   }
 
-  const db = getPrismaWithUser(userId);
-
-  const category = await db.category.create({
+  const category = await prisma.category.create({
     data: {
       name,
       color: color || '#6B7280',
@@ -46,30 +44,35 @@ export const createCategoryService = async (req: AuthRequest, res: any) => {
     },
   });
 
-  return { message: 'Categoria criada com sucesso', data: category, statusCode: 201 };
+  return { category, statusCode: 201 };
 };
 
-export const updateCategoryService = async (req: AuthRequest, res: any) => {
-  const userId = req.user?.userId;
+export const updateCategoryService = async (
+  userId: string,
+  categoryId: string,
+  data: { name?: string; color?: string; icon?: string }
+) => {
   if (!userId) {
     throw new AppError('Usuário não autenticado', 401);
   }
 
-  const categoryId = String(req.params.id);
-  const { name, color, icon } = req.body;
+  const { name, color, icon } = data;
 
-  const db = getPrismaWithUser(userId);
-
-  const existing = await db.category.findUnique({
-    where: { id: categoryId },
+  const existing = await prisma.category.findUnique({
+    where: { id: categoryId, userId },
   });
 
   if (!existing) {
     throw new AppError('Categoria não encontrada ou sem permissão para alteração', 404);
   }
 
-  const updated = await db.category.update({
-    where: { id: categoryId },
+  // Defesa em profundidade: verificação explícita de propriedade
+  if (existing.userId !== userId) {
+    throw new AppError('Você não tem permissão para alterar esta categoria', 403);
+  }
+
+  const updated = await prisma.category.update({
+    where: { id: categoryId, userId },
     data: {
       name: name ?? existing.name,
       color: color ?? existing.color,
@@ -77,30 +80,30 @@ export const updateCategoryService = async (req: AuthRequest, res: any) => {
     },
   });
 
-  return { message: 'Categoria atualizada com sucesso', data: updated };
+  return { category: updated };
 };
 
-export const deleteCategoryService = async (req: AuthRequest, res: any) => {
-  const userId = req.user?.userId;
+export const deleteCategoryService = async (userId: string, categoryId: string) => {
   if (!userId) {
     throw new AppError('Usuário não autenticado', 401);
   }
 
-  const categoryId = String(req.params.id);
-
-  const db = getPrismaWithUser(userId);
-
-  const existing = await db.category.findUnique({
-    where: { id: categoryId },
+  const existing = await prisma.category.findUnique({
+    where: { id: categoryId, userId },
   });
 
   if (!existing) {
     throw new AppError('Categoria não encontrada ou sem permissão para exclusão', 404);
   }
 
-  await db.category.delete({
-    where: { id: categoryId },
+  // Defesa em profundidade: verificação explícita de propriedade
+  if (existing.userId !== userId) {
+    throw new AppError('Você não tem permissão para excluir esta categoria', 403);
+  }
+
+  await prisma.category.delete({
+    where: { id: categoryId, userId },
   });
 
-  return { message: 'Categoria excluída com sucesso' };
+  return { id: categoryId };
 };
