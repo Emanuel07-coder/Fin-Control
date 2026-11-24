@@ -272,14 +272,8 @@ describe('Auth Service', () => {
 
       expect(mockVerifyRefreshToken).toHaveBeenCalledWith('oldRefreshToken');
       expect(mockRotateRefreshToken).toHaveBeenCalledWith('user-123', 'oldRefreshToken');
-      expect(mockPrisma.refreshToken.deleteMany).toHaveBeenCalledWith({ where: { userId: 'user-123' } });
-      expect(mockPrisma.refreshToken.create).toHaveBeenCalledWith({
-        data: {
-          userId: 'user-123',
-          token: 'newRefreshToken',
-          expiresAt: expect.any(Date),
-        }
-      });
+      // A rotacao agora e feita dentro de rotateRefreshToken (mockado aqui),
+      // entao nao ha deleteMany/create diretos no prisma neste teste de service.
       expect(mockRes.cookie).toHaveBeenCalledWith('refreshToken', 'newRefreshToken', {
         httpOnly: true,
         secure: false,

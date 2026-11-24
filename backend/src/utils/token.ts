@@ -84,21 +84,15 @@ export const refreshAuthTokens = async (
   // Verify the refresh token
   const payload = await verifyRefreshToken(oldRefreshToken);
 
-  // Delete all existing refresh tokens for the user
-  await prisma.refreshToken.deleteMany({ where: { userId: payload.userId } });
+  // Rotate the refresh token atomically: revoke the old one and persist the
+  // new one within the same ACID transaction. Throws AppError (401) if the
+  // old token was already reused/revoked, revoking all user tokens in that case.
+  const newRefreshToken = await rotateRefreshToken(
+    payload.userId,
+    oldRefreshToken
+  );
 
-  // Generate new tokens
-  const newRefreshToken = await rotateRefreshToken(payload.userId, oldRefreshToken);
   const accessToken = signAccessToken(payload);
-
-  // Save the new refresh token
-  await prisma.refreshToken.create({
-    data: {
-      userId: payload.userId,
-      token: newRefreshToken,
-      expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
-    },
-  });
 
   return {
     accessToken,

@@ -5,6 +5,7 @@ const requiredEnv = [
   'JWT_SECRET',
   'JWT_REFRESH_SECRET',
   'JWT_ACCESS_SECRET',
+  'NODE_ENV',
 ];
 
 export const validateEnv = (): void => {

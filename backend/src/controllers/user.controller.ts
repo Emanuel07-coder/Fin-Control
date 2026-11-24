@@ -5,6 +5,7 @@ import { AppError } from '../utils/AppError';
 import PDFDocument from 'pdfkit';
 import { Transform } from 'stream';
 import { revokeUserSessions } from '../utils/token';
+import { invalidateUserCache } from '../middleware/auth';
 
 // ============================================
 // Utilitários
@@ -197,6 +198,9 @@ export const deleteAccount = async (req: AuthRequest, res: Response): Promise<vo
 
   // Revoga todas as sessões (refresh tokens) do usuário
   await revokeUserSessions(userId);
+
+  // Invalida o cache de usuário para forçar re-autenticação na próxima requisição
+  invalidateUserCache(userId);
 
   // Exclui o usuário. O Prisma aplica ON DELETE CASCADE em:
   // refresh_tokens, categories, transactions e budgets, removendo

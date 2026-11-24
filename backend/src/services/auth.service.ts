@@ -255,6 +255,9 @@ export const deleteAccountService = async (req: AuthRequest, res: Response) => {
   // Revoga todas as sessões (refresh tokens) do usuário
   await revokeUserSessions(userId);
 
+  // Invalida o cache de usuário para forçar re-autenticação na próxima requisição
+  invalidateUserCache(userId);
+
   // Exclui o usuário. O Prisma aplica ON DELETE CASCADE em:
   // refresh_tokens, categories, transactions e budgets, removendo
   // todos os dados pessoais associados (conforme LGPD).
